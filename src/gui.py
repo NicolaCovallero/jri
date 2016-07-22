@@ -11,17 +11,20 @@ Simple GUI for my robot.
 
 import os, sys
 from PyQt4 import QtGui, QtCore
-import cv
+import cv, cv2
 import communication
 import time
-import threading
+import matplotlib.image as mpimg
+from PIL import Image
+import numpy
 
 
 class JRI(QtGui.QWidget):#inheretid qtgui
 
     def __init__(self):
         super(JRI, self).__init__()
-
+        self.counter = 1 # silly thing, only for testing in the UpdateImage method
+        self.image = 1 # the same of the one above
         # properties
         self.max_speed = 100
         self.min_speed = 70
@@ -29,17 +32,22 @@ class JRI(QtGui.QWidget):#inheretid qtgui
 
         self.udp_socket = communication.Communication()
 
+        self.time_last_frame = 0
 
-        self.camera_index = 0
-        self.capture = cv.CaptureFromCAM(self.camera_index)
-        cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_WIDTH, 1280)
-        cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_HEIGHT, 720)
+        # self.camera_index = 0
+        # self.capture = cv.CaptureFromCAM(self.camera_index)
+        # cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_WIDTH, 1280)
+        # cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_HEIGHT, 720)
 
         self.connected_to_RP = False
 
         self.IP = ""
 
+        self.picamera_frame = cv.LoadImage("img/jri_logo.png")
+
         self.initUI()  # creation of the gui
+
+
 
     def initUI(self):
 
@@ -59,6 +67,7 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         # use full ABSOLUTE path to the image, not relative
         self.pic.setPixmap(QtGui.QPixmap(os.getcwd() + "/img/logo.png"))
         self.pic.setToolTip('Image seen by the webcam')
+        #self.timer.timeout.connect(self.updateImageCV)
         self.timer.timeout.connect(self.updateImage)
 
         btn = QtGui.QPushButton('Exit', self)
@@ -122,7 +131,7 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         self.fileMenu.addAction(settingsAction)
 
         testAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&TestThread', self)
-        testAction.triggered.connect(self.launchTestThread)
+        testAction.triggered.connect(self.getData)
         self.fileMenu.addAction(testAction)
         # ---------------------------------------------------------
 
@@ -179,12 +188,12 @@ class JRI(QtGui.QWidget):#inheretid qtgui
             [success,data] = self.udp_socket.receiveData(timeout=self.timeout) # do not put it too fast, otherwise the IP is wrong
             if success:
                 if data[0] == msg:
-                    self.IP = data[1]
+                    self.IP = data[1][0]
                     # double check the IP address
                     self.udp_socket.sentData(msg, IP)
                     [success, data] = self.udp_socket.receiveData(timeout=self.timeout)  # do not put it too fast, otherwise the IP is wrong
                     if success:
-                        if data[0] == msg and self.IP == data[1]:
+                        if data[0] == msg and self.IP == data[1][0]:
                             self.IP = data[1][0]
                             print "The IP address of Jonnhy Robot is", IP
                             break
@@ -220,13 +229,69 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
-    def updateImage(self):
+    def updateImageCV(self):
         self.frame = cv.QueryFrame(self.capture)
         self.resize_frame = cv.CreateMat(480, 640, cv.CV_8UC3)
         cv.Resize(self.frame, self.resize_frame)
         image = QtGui.QImage(self.resize_frame.tostring(), self.resize_frame.width, self.resize_frame.height, QtGui.QImage.Format_RGB888).rgbSwapped()
 
         pixmap = QtGui.QPixmap.fromImage(image)
+        self.pic.setPixmap(pixmap)
+
+    def PIL2array(self,img):
+        return numpy.array(img.getdata(),
+                           numpy.uint8).reshape(img.size[1], img.size[0], 3)
+
+    def updateImage(self):
+
+        self.counter = self.counter + 1
+        print "updating Image", self.counter
+
+        # silly thing just to see how fast is, changing mage each iteration
+        time_ = time.time()
+        if self.image == 1:
+            pi = Image.open('img/tux.jpg')
+            self.image = 2
+        else:
+            pi = Image.open('img/jri_logo.png')
+            self.image = 1
+        print 'Time to open the file: ' , time.time() - time_
+        # we skip the conversion process by transforming the image directly from the QImage
+        #self.frame = cv.fromarray(numpy.asarray(pi).astype(numpy.uint8))
+        #print "frame size", self.frame.channels
+        #self.resize_frame = cv.CreateMat(480, 640, self.frame.type)#
+        #cv.Resize(self.frame, self.resize_frame)
+        #self.resize_frame =  numpy.array(self.resize_frame)
+
+        # print self.resize_frame.shape
+        time_ = time.time()
+        a = numpy.asarray(pi).astype(numpy.uint32)
+        # we know pack the RGB values (also the Alpha channel if it exists (PNG))
+        # They have to be pucked accordingly to the Format of the QImage, in pour case ARGB32
+        # which means 32 bits where: 8 bites (alpha) - 8 bites (red) - 8 bites (green) - 8 bites (blue)
+        # if the file has no alpha is better to put a fake one.
+        if a.shape[2] == 4:
+            b = (  a[:, :, 3] << 24 | a[:, :, 0] << 16 | a[:, :, 1] << 8 | a[:, :, 2]).flatten()
+        else:
+            b = ( 255 << 24 | a[:, :, 0] << 16 | a[:, :, 1] << 8 | a[:, :, 2]).flatten()
+        image = QtGui.QImage(b, a.shape[1], a.shape[0], QtGui.QImage.Format_ARGB32)
+        size = QtCore.QSize(640,480)
+        image = image.scaled(size)
+
+        #
+        # image = QtGui.QImage(self.resize_frame.shape[1],self.resize_frame.shape[0], QtGui.QImage.Format_RGB888)
+        #
+        # for x in range(0,self.resize_frame.shape[1]):
+        #     for y in range(0, self.resize_frame.shape[0]):
+        #         c = QtGui.QColor(self.resize_frame[y][x][0],self.resize_frame[y][x][1],self.resize_frame[y][x][2])
+        #         image.setPixel(x,y,c.rgb())
+        print "To convert the image took", time.time() - time_
+
+        #cv2.imshow('image', a.astype(numpy.uint8))
+        #cv2.waitKey()
+
+        pixmap = QtGui.QPixmap.fromImage(image)
+
         self.pic.setPixmap(pixmap)
 
     def keyPressEvent(self, e):
@@ -256,15 +321,27 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         self.settingsWindow.exec_()
         pass
 
-    def launchTestThread(self):
+    def getData(self):
         self.threads = [] # <---- IMPORTANT TO PUT
-        testThread = TestThread (0)
-        testThread.data_downloaded.connect(self.on_data_ready)
-        self.threads.append(testThread) # <---- IMPORTANT TO PUT
-        testThread.start()
+        receiveDataSonar = ReceiveData(self.udp_socket,self.timeout)
+        receiveDataSonar.data_received.connect(self.data_received_sonar)
+        self.threads.append(receiveDataSonar)
+        #receiveDataSonar.start()
 
-    def on_data_ready(self,signal):
-        print "The signal is:", signal
+        receiveDatacamera = ReceiveData(self.udp_socket, self.timeout, 40*1024)
+        receiveDatacamera.data_received.connect(self.data_received_camera)
+        self.threads.append(receiveDatacamera)
+        receiveDatacamera.start()
+
+    def data_received_sonar(self,data):
+        if self.IP == data[1][0]:
+            self.sonar_dist = float(data)
+
+    def data_received_camera(self, data):
+        if self.IP == data[1][0]:
+            print "received data"
+            self.picamera_frame = cv.fromarray(data)
+            self.time_last_frame = time.time()
 
 # reference: http://stackoverflow.com/questions/13517568/how-to-create-new-pyqt4-windows-from-an-existing-window
 class SettingsWindow(QtGui.QDialog):
@@ -330,22 +407,26 @@ class SettingsWindow(QtGui.QDialog):
     def cancelBtn(self):
         self.close()
 
-class TestThread(QtCore.QThread):
-    data_downloaded = QtCore.pyqtSignal(object) # this is a signal
 
-    def __init__(self, init):
+class ReceiveData(QtCore.QThread):
+    # reference: http://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt
+    data_received = QtCore.pyqtSignal(object) # this is a signal
+
+    def __init__(self, socket,timeout,buffer_size = 1024):
         QtCore.QThread.__init__(self)
-        self.init = init
+        self.socket = socket
+        self.timeout = timeout
+        self.buffer_size = buffer_size
 
     def run(self):
-        # self.data_downloaded.emi def __init__(self, url):
         while 1:
-            time.sleep(0.5)
-            self.init = self.init + 1
-            print self.init
-            if self.init == 10:
-                self.data_downloaded.emit("done") # emit the signal
-                return
+            [success, data] = self.socket.receiveData(timeout=self.timeout, bufferSize = self.buffer_size)
+            if success:
+                print 'Data received: ', data[0]
+                self.data_received.emit(data)
+            else:
+                pass
+                print 'Data NOT received'
 
 
 def main():
