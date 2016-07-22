@@ -19,9 +19,11 @@ from PIL import Image
 import numpy
 
 
-class JRI(QtGui.QWidget):#inheretid qtgui
-
+class JRI(QtGui.QWidget):
+    # TODO create docstrings
     def __init__(self):
+
+
         super(JRI, self).__init__()
         self.counter = 1 # silly thing, only for testing in the UpdateImage method
         self.image = 1 # the same of the one above
@@ -153,6 +155,10 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         self.velocity_label.setText(str_)
 
     def connect(self):
+        """
+
+        :return:
+        """
 
         print "The current IP saved in the system is: ", self.IP
 
@@ -322,6 +328,11 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         pass
 
     def getData(self):
+        # TODO these two sockets are the same and are waiting for different data, we should use just one
+        # and add a code to specify the kind of data it has been sent
+        # When we send a data we can specify the kind of port (In the rasp the socket has been binded)
+        # We could do here a similar thing creating two sockets only for riceiving
+
         self.threads = [] # <---- IMPORTANT TO PUT
         receiveDataSonar = ReceiveData(self.udp_socket,self.timeout)
         receiveDataSonar.data_received.connect(self.data_received_sonar)
