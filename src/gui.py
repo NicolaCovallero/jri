@@ -5,7 +5,6 @@
 Nicola Covallero
 
 Simple GUI for my robot.
-This is a test, the GUI should work in ROS
 """
 
 # https://pythonspot.com/en/pyqt4/
@@ -14,15 +13,22 @@ import os, sys
 from PyQt4 import QtGui, QtCore
 import cv
 import communication
+import time
+import threading
+
 
 class JRI(QtGui.QWidget):#inheretid qtgui
 
     def __init__(self):
         super(JRI, self).__init__()
 
-        self.max_speed = 10
+        # properties
+        self.max_speed = 100
+        self.min_speed = 70
+        self.timeout = 0.05 # timeout for the socket test conection
 
-        self.initUI() #creation of the gui
+        self.udp_socket = communication.Communication()
+
 
         self.camera_index = 0
         self.capture = cv.CaptureFromCAM(self.camera_index)
@@ -32,6 +38,8 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         self.connected_to_RP = False
 
         self.IP = ""
+
+        self.initUI()  # creation of the gui
 
     def initUI(self):
 
@@ -53,7 +61,7 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         self.pic.setToolTip('Image seen by the webcam')
         self.timer.timeout.connect(self.updateImage)
 
-        btn = QtGui.QPushButton('Close Button', self)
+        btn = QtGui.QPushButton('Exit', self)
         btn.setToolTip('Close the GUI')
         #btn.clicked.connect(QtCore.QCoreApplication.instance().quit) # connect to the quit function
         btn.clicked.connect(self.closeButtonEvent)
@@ -70,17 +78,17 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         self.sld = QtGui.QSlider(QtCore.Qt.Vertical, self)
         self.sld.setFocusPolicy(QtCore.Qt.NoFocus)
         self.sld.setGeometry(640,pbtn.height() + btn.height() , 30,100)
-        self.sld.valueChanged[int].connect(self.changeValue)
-        self.sld.setMinimum(0)
+        self.sld.setMinimum(self.min_speed)
         self.sld.setMaximum(self.max_speed)
-        self.sld.setValue(2)
-        self.sld.setTickInterval(10)
+        self.sld.setValue((self.max_speed + self.min_speed)/2)
+        self.sld.setTickInterval(50)
         self.sld.setTickPosition(QtGui.QSlider.TicksLeft)
-
         # VELOCITY LABEL (Connectede to slider)
         self.velocity_label = QtGui.QLabel(self)
         self.velocity_label.setText('Velocity: \n' + str(self.sld.value()))
-        self.velocity_label.setGeometry(640 + self.sld.width(), pbtn.height() + btn.height() , 100,100)
+        self.velocity_label.setGeometry(640 + self.sld.width(), pbtn.height() + btn.height(), 100, 100)
+        self.velocity_label.setToolTip('PWM value')
+        self.sld.valueChanged[int].connect(self.changeValue)
 
         # sonar pic
         self.sonar_pic = QtGui.QLabel(self)
@@ -112,6 +120,10 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         settingsAction.setStatusTip('Open settings')
         settingsAction.triggered.connect(self.openSettings)
         self.fileMenu.addAction(settingsAction)
+
+        testAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&TestThread', self)
+        testAction.triggered.connect(self.launchTestThread)
+        self.fileMenu.addAction(testAction)
         # ---------------------------------------------------------
 
 
@@ -135,8 +147,6 @@ class JRI(QtGui.QWidget):#inheretid qtgui
 
         print "The current IP saved in the system is: ", self.IP
 
-        timeout = 0.05
-        self.udp_socket = communication.Communication()
 
         IP = self.IP
 
@@ -145,14 +155,14 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         msg = "connected"
         self.udp_socket.sentData(msg, IP)
         [success, data] = self.udp_socket.receiveData(
-            timeout=timeout)  # do not put it too fast, otherwise the IP is wrong
+            timeout=self.timeout)  # do not put it too fast, otherwise the IP is wrong
         if success:
             if data[0] == msg:
                 self.IP = data[1]
                 # double check the IP address
                 self.udp_socket.sentData(msg, IP)
                 [success, data] = self.udp_socket.receiveData(
-                    timeout=timeout)  # do not put it too fast, otherwise the IP is wrong
+                    timeout=self.timeout)  # do not put it too fast, otherwise the IP is wrong
                 if success:
                     if data[0] == msg and self.IP == data[1]:
                         self.IP = data[1][0]
@@ -166,13 +176,13 @@ class JRI(QtGui.QWidget):#inheretid qtgui
 
             msg = "connected"
             self.udp_socket.sentData(msg,IP)
-            [success,data] = self.udp_socket.receiveData(timeout=timeout) # do not put it too fast, otherwise the IP is wrong
+            [success,data] = self.udp_socket.receiveData(timeout=self.timeout) # do not put it too fast, otherwise the IP is wrong
             if success:
                 if data[0] == msg:
                     self.IP = data[1]
                     # double check the IP address
                     self.udp_socket.sentData(msg, IP)
-                    [success, data] = self.udp_socket.receiveData(timeout=timeout)  # do not put it too fast, otherwise the IP is wrong
+                    [success, data] = self.udp_socket.receiveData(timeout=self.timeout)  # do not put it too fast, otherwise the IP is wrong
                     if success:
                         if data[0] == msg and self.IP == data[1]:
                             self.IP = data[1][0]
@@ -246,30 +256,65 @@ class JRI(QtGui.QWidget):#inheretid qtgui
         self.settingsWindow.exec_()
         pass
 
+    def launchTestThread(self):
+        self.threads = [] # <---- IMPORTANT TO PUT
+        testThread = TestThread (0)
+        testThread.data_downloaded.connect(self.on_data_ready)
+        self.threads.append(testThread) # <---- IMPORTANT TO PUT
+        testThread.start()
+
+    def on_data_ready(self,signal):
+        print "The signal is:", signal
+
 # reference: http://stackoverflow.com/questions/13517568/how-to-create-new-pyqt4-windows-from-an-existing-window
 class SettingsWindow(QtGui.QDialog):
     def __init__(self, parent=None):
         super(SettingsWindow, self).__init__(parent)
         self.IP = ""
-        self.initUI()
         self.parent = parent
+        self.initUI()
 
 
     def initUI(self):
 
         self.apply_btn = QtGui.QPushButton("Apply")
         self.apply_btn.clicked.connect(self.applyChanges)
+        self.cancel_btn = QtGui.QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.cancelBtn)
         #self.btn.clicked.connect(self.getItem)
         layout = QtGui.QFormLayout()
-        layout.addRow(self.apply_btn)
+        layout.addRow(self.cancel_btn, self.apply_btn)
+
+        # IP address -----------------------------
         self.IP_label = QtGui.QLabel(self)
         self.IP_label.setText('IP:')
         self.IP_input = QtGui.QLineEdit()
         self.IP_input.setText(self.IP)
         layout.addRow(self.IP_label, self.IP_input)
-        self.setLayout(layout)
+        # ----------------------------------------
+
+        # minimum velocity -----------------------
+        self.min_speed_label = QtGui.QLabel(self)
+        self.min_speed_label.setText('Minimum speed:')
+        self.min_speed_label.setToolTip('Minimum PWM value to make the motors work. This should be tune for each Robot (pair of motors )')
+        self.min_speed_input = QtGui.QLineEdit()
+        self.min_speed_input.setText(str(self.parent.min_speed))
+        layout.addRow(self.min_speed_label, self.min_speed_input)
+        # ----------------------------------------
+
+        # minimum velocity -----------------------
+        self.timeout_label = QtGui.QLabel(self)
+        self.timeout_label.setText('Timeout:')
+        self.timeout_label.setToolTip(
+            'Timeout value for testing the connection with RPI, bigger it is better it is, but more time to find the Jonny Robot in the Network')
+        self.timeout_input = QtGui.QLineEdit()
+        self.timeout_input.setText(str(self.parent.timeout))
+        layout.addRow(self.timeout_label, self.timeout_input)
+        # ----------------------------------------
+
 
         # MAIN WINDOW
+        self.setLayout(layout)
         self.setGeometry(300, 300, 300, 300)
         self.setWindowIcon(QtGui.QIcon('img/Settings-L-icon.png'))
         self.setWindowTitle('Settings')
@@ -277,7 +322,30 @@ class SettingsWindow(QtGui.QDialog):
     def applyChanges(self):
 
         self.parent.IP = self.IP_input.text()
+        self.parent.min_speed = int(self.min_speed_input.text())
+        self.parent.sld.setMinimum(self.parent.min_speed)
+        self.parent.timeout = float(self.timeout_input.text())
         self.close()
+
+    def cancelBtn(self):
+        self.close()
+
+class TestThread(QtCore.QThread):
+    data_downloaded = QtCore.pyqtSignal(object) # this is a signal
+
+    def __init__(self, init):
+        QtCore.QThread.__init__(self)
+        self.init = init
+
+    def run(self):
+        # self.data_downloaded.emi def __init__(self, url):
+        while 1:
+            time.sleep(0.5)
+            self.init = self.init + 1
+            print self.init
+            if self.init == 10:
+                self.data_downloaded.emit("done") # emit the signal
+                return
 
 
 def main():
