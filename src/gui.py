@@ -331,6 +331,8 @@ class JRI(QtGui.QWidget):
     def print_(self,text):
         print text
         self.textLog.append(text)
+        self.textLog.moveCursor(QtGui.QTextCursor.End)
+
 
 
 # reference: http://stackoverflow.com/questions/13517568/how-to-create-new-pyqt4-windows-from-an-existing-window
