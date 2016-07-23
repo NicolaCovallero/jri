@@ -12,7 +12,7 @@ Simple GUI for my robot.
 import os, sys
 from PyQt4 import QtGui, QtCore
 import cv, cv2
-import communication
+import udpsocket
 import time
 import matplotlib.image as mpimg
 from PIL import Image
@@ -32,7 +32,7 @@ class JRI(QtGui.QWidget):
         self.min_speed = 70
         self.timeout = 0.05 # timeout for the socket test conection
 
-        self.udp_socket = communication.Communication()
+        self.udp_socket = udpsocket.UDPSocket()
 
         self.time_last_frame = 0
 
@@ -45,10 +45,10 @@ class JRI(QtGui.QWidget):
 
         self.IP = ""
 
-        self.picamera_frame = cv.LoadImage("img/jri_logo.png")
-
+        self.picamera_frame = Image.open('img/jri_logo.png')
+        self.connection_port = 2525
+        self.connected_to_robot = False
         self.initUI()  # creation of the gui
-
 
 
     def initUI(self):
@@ -72,23 +72,24 @@ class JRI(QtGui.QWidget):
         #self.timer.timeout.connect(self.updateImageCV)
         self.timer.timeout.connect(self.updateImage)
 
-        btn = QtGui.QPushButton('Exit', self)
-        btn.setToolTip('Close the GUI')
-        #btn.clicked.connect(QtCore.QCoreApplication.instance().quit) # connect to the quit function
-        btn.clicked.connect(self.closeButtonEvent)
-        btn.resize(btn.sizeHint())
-        btn.move(640, 0)
+        self.btn = QtGui.QPushButton('Exit', self)
+        self.btn.setToolTip('Close the GUI')
+        #self.btn.clicked.connect(QtCore.QCoreApplication.instance().quit) # connect to the quit function
+        self.btn.clicked.connect(self.closeButtonEvent)
+        self.btn.resize(self.btn.sizeHint())
+        self.btn.move(640, 0)
 
-        pbtn = QtGui.QPushButton('Connect', self)
-        pbtn.setToolTip('Connect to the Raspberry by testing all the possible IPs')
-        pbtn.clicked.connect(self.connect)
-        pbtn.resize(btn.sizeHint())
-        pbtn.move(640, btn.height())
+        self.pbtn = QtGui.QPushButton('Connect', self)
+        self.pbtn.setStyleSheet("background-color: red")
+        self.pbtn.setToolTip('Connect to the Raspberry by testing all the possible IPs')
+        self.pbtn.clicked.connect(self.connect)
+        self.pbtn.resize(self.btn.sizeHint())
+        self.pbtn.move(640, self.btn.height())
 
         # SLIDER
         self.sld = QtGui.QSlider(QtCore.Qt.Vertical, self)
         self.sld.setFocusPolicy(QtCore.Qt.NoFocus)
-        self.sld.setGeometry(640,pbtn.height() + btn.height() , 30,100)
+        self.sld.setGeometry(640,self.pbtn.height() + self.btn.height() , 30,100)
         self.sld.setMinimum(self.min_speed)
         self.sld.setMaximum(self.max_speed)
         self.sld.setValue((self.max_speed + self.min_speed)/2)
@@ -97,13 +98,13 @@ class JRI(QtGui.QWidget):
         # VELOCITY LABEL (Connectede to slider)
         self.velocity_label = QtGui.QLabel(self)
         self.velocity_label.setText('Velocity: \n' + str(self.sld.value()))
-        self.velocity_label.setGeometry(640 + self.sld.width(), pbtn.height() + btn.height(), 100, 100)
+        self.velocity_label.setGeometry(640 + self.sld.width(), self.pbtn.height() + self.btn.height(), 100, 100)
         self.velocity_label.setToolTip('PWM value')
         self.sld.valueChanged[int].connect(self.changeValue)
 
         # sonar pic
         self.sonar_pic = QtGui.QLabel(self)
-        self.sonar_pic.setGeometry(640, pbtn.height() + btn.height() + self.sld.height() + 10, 90, 59)
+        self.sonar_pic.setGeometry(640, self.pbtn.height() + self.btn.height() + self.sld.height() + 10, 90, 59)
         # use full ABSOLUTE path to the image, not relative
         self.sonar_pic.setPixmap(QtGui.QPixmap(os.getcwd() + "/img/sonar_cropped2.png"))
         self.sonar_pic.setToolTip('Sonar')
@@ -137,14 +138,22 @@ class JRI(QtGui.QWidget):
         self.fileMenu.addAction(testAction)
         # ---------------------------------------------------------
 
-
-
+        # Text Log ------------------------------------------------
+        self.textLog = QtGui.QTextEdit(self)
+        self.textLog.setReadOnly(True)
+        self.textLog.setGeometry(0, 530, 640 + self.btn.width(), 100)
+        self.textLog.ensureCursorVisible()
+        self.textLog.setToolTip('Text log, It shows relevant information of the system.')
+        # ---------------------------------------------------------
 
         # MAIN WINDOW
-        self.setGeometry(300, 300, 640 + btn.width(), 510)# size + position of the widget
+        window_width = 640 + self.btn.width()
+        window_height = 630
+        self.setGeometry(300, 300, window_width , window_height)# size + position of the widget
         self.center()
         self.setWindowTitle('JRI - Jonny Robot Interface')
         self.setWindowIcon(QtGui.QIcon('img/jri_logo.png'))
+        self.setFixedSize(window_width,window_height)
         self.show()
 
         # ------------- Secodnary Windows
@@ -155,57 +164,11 @@ class JRI(QtGui.QWidget):
         self.velocity_label.setText(str_)
 
     def connect(self):
-        """
-
-        :return:
-        """
-
-        print "The current IP saved in the system is: ", self.IP
-
-
-        IP = self.IP
-
-        print 'Testing IP address: ', IP
-
-        msg = "connected"
-        self.udp_socket.sentData(msg, IP)
-        [success, data] = self.udp_socket.receiveData(
-            timeout=self.timeout)  # do not put it too fast, otherwise the IP is wrong
-        if success:
-            if data[0] == msg:
-                self.IP = data[1]
-                # double check the IP address
-                self.udp_socket.sentData(msg, IP)
-                [success, data] = self.udp_socket.receiveData(
-                    timeout=self.timeout)  # do not put it too fast, otherwise the IP is wrong
-                if success:
-                    if data[0] == msg and self.IP == data[1]:
-                        self.IP = data[1][0]
-                        print "The IP address of Jonnhy Robot is", IP
-                        return
-
-        for i in range(0,100):
-            IP = "192.168.1." + str(i)
-
-            print 'Testing IP address: ', IP
-
-            msg = "connected"
-            self.udp_socket.sentData(msg,IP)
-            [success,data] = self.udp_socket.receiveData(timeout=self.timeout) # do not put it too fast, otherwise the IP is wrong
-            if success:
-                if data[0] == msg:
-                    self.IP = data[1][0]
-                    # double check the IP address
-                    self.udp_socket.sentData(msg, IP)
-                    [success, data] = self.udp_socket.receiveData(timeout=self.timeout)  # do not put it too fast, otherwise the IP is wrong
-                    if success:
-                        if data[0] == msg and self.IP == data[1][0]:
-                            self.IP = data[1][0]
-                            print "The IP address of Jonnhy Robot is", IP
-                            break
-
-        if IP == "192.168.1.99":
-            print "Failed  to connect to jonny robot, either it is turn off or not UDP socket has been created"
+        self.threads = []  # <---- IMPORTANT TO PUT
+        connection = ConnectToRobot(self)
+        connection.connection_done.connect(self.update_connection)
+        self.threads.append(connection)
+        connection.start()
 
     def closeEvent(self, event):# this is the reimplementation of the default closeEvent of QtGui
 
@@ -250,18 +213,18 @@ class JRI(QtGui.QWidget):
 
     def updateImage(self):
 
-        self.counter = self.counter + 1
-        print "updating Image", self.counter
+        #self.counter = self.counter + 1
+        #print "updating Image", self.counter
 
         # silly thing just to see how fast is, changing mage each iteration
-        time_ = time.time()
-        if self.image == 1:
-            pi = Image.open('img/tux.jpg')
-            self.image = 2
-        else:
-            pi = Image.open('img/jri_logo.png')
-            self.image = 1
-        print 'Time to open the file: ' , time.time() - time_
+
+        #if self.image == 1:
+        #    pi = Image.open('img/tux.jpg')
+        #    self.image = 2
+        #else:
+        #    pi = Image.open('img/jri_logo.png')
+        #    self.image = 1
+
         # we skip the conversion process by transforming the image directly from the QImage
         #self.frame = cv.fromarray(numpy.asarray(pi).astype(numpy.uint8))
         #print "frame size", self.frame.channels
@@ -271,6 +234,7 @@ class JRI(QtGui.QWidget):
 
         # print self.resize_frame.shape
         time_ = time.time()
+        pi = self.picamera_frame
         a = numpy.asarray(pi).astype(numpy.uint32)
         # we know pack the RGB values (also the Alpha channel if it exists (PNG))
         # They have to be pucked accordingly to the Format of the QImage, in pour case ARGB32
@@ -291,7 +255,7 @@ class JRI(QtGui.QWidget):
         #     for y in range(0, self.resize_frame.shape[0]):
         #         c = QtGui.QColor(self.resize_frame[y][x][0],self.resize_frame[y][x][1],self.resize_frame[y][x][2])
         #         image.setPixel(x,y,c.rgb())
-        print "To convert the image took", time.time() - time_
+        # print "To convert the image took", time.time() - time_
 
         #cv2.imshow('image', a.astype(numpy.uint8))
         #cv2.waitKey()
@@ -302,18 +266,18 @@ class JRI(QtGui.QWidget):
 
     def keyPressEvent(self, e):
         if e.key() == QtCore.Qt.Key_W:
-            print 'pressed W'
+            self.print_('pressed W')
         elif e.key() == QtCore.Qt.Key_S:
-            print 'pressed S'
+            self.print_( 'pressed S')
         elif e.key() == QtCore.Qt.Key_A:
-            print 'pressed A'
+            self.print_( 'pressed A')
         elif e.key() == QtCore.Qt.Key_D:
-            print 'pressed D'
+            self.print_( 'pressed D')
         elif e.key() == QtCore.Qt.Key_Minus:
-            print 'Reducing speed'
+            self.print_( 'Reducing speed')
             self.sld.setValue(self.sld.value() - 1)
         elif e.key() == QtCore.Qt.Key_Plus:
-            print 'Increasing speed'
+            self.print_( 'Increasing speed')
             self.sld.setValue(self.sld.value() + 1)
         """
         NOTE: to make a 2 key press you have to set for each keypress save the key,
@@ -332,6 +296,7 @@ class JRI(QtGui.QWidget):
         # and add a code to specify the kind of data it has been sent
         # When we send a data we can specify the kind of port (In the rasp the socket has been binded)
         # We could do here a similar thing creating two sockets only for riceiving
+        # http://stackoverflow.com/questions/8994937/send-image-using-socket-programming-python
 
         self.threads = [] # <---- IMPORTANT TO PUT
         receiveDataSonar = ReceiveData(self.udp_socket,self.timeout)
@@ -339,7 +304,7 @@ class JRI(QtGui.QWidget):
         self.threads.append(receiveDataSonar)
         #receiveDataSonar.start()
 
-        receiveDatacamera = ReceiveData(self.udp_socket, self.timeout, 40*1024)
+        receiveDatacamera = ReceiveData(self.udp_socket, self.timeout, 40*8192)
         receiveDatacamera.data_received.connect(self.data_received_camera)
         self.threads.append(receiveDatacamera)
         receiveDatacamera.start()
@@ -351,8 +316,22 @@ class JRI(QtGui.QWidget):
     def data_received_camera(self, data):
         if self.IP == data[1][0]:
             print "received data"
-            self.picamera_frame = cv.fromarray(data)
+            #self.picamera_frame = cv.fromarray(data)
+            self.picamera_frame = data
             self.time_last_frame = time.time()
+
+    def update_connection(self, data):
+        self.connected_to_robot = data
+        print 'Data: ', data
+        if data:
+            self.pbtn.setStyleSheet("background-color: green")
+        else:
+            self.pbtn.setStyleSheet("background-color: red")
+
+    def print_(self,text):
+        print text
+        self.textLog.append(text)
+
 
 # reference: http://stackoverflow.com/questions/13517568/how-to-create-new-pyqt4-windows-from-an-existing-window
 class SettingsWindow(QtGui.QDialog):
@@ -433,11 +412,74 @@ class ReceiveData(QtCore.QThread):
         while 1:
             [success, data] = self.socket.receiveData(timeout=self.timeout, bufferSize = self.buffer_size)
             if success:
-                print 'Data received: ', data[0]
+                print 'Data received: ' + str(data[0])
                 self.data_received.emit(data)
             else:
                 pass
                 print 'Data NOT received'
+
+
+class ConnectToRobot(QtCore.QThread):
+    # reference: http://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt
+    connection_done = QtCore.pyqtSignal(object) # this is a signal
+
+    def __init__(self, GUI):
+        QtCore.QThread.__init__(self)
+        self.GUI = GUI # main window
+
+    def run(self):
+        self.GUI.print_("\n --------------------------------------------- \n CONNECTING TO JONNY ROBOT ")
+        self.GUI.print_(" ---------------------------------------------")
+        self.GUI.print_ ("The current IP saved in the system is: " + str(self.GUI.IP))
+
+        IP =self.GUI.IP
+
+        self.GUI.print_('Testing IP address: ' + str(IP))
+
+        msg = "connected"
+        self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+        [success, data] = self.GUI.udp_socket.receiveData(
+            timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
+        if success:
+            if data[0] == msg:
+                self.GUI.IP = data[1]
+                # double check the IP address
+                self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+                [success, data] = self.GUI.udp_socket.receiveData(
+                    timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
+                if success:
+                    if data[0] == msg and self.GUI.IP == data[1]:
+                        self.GUI.IP = data[1][0]
+                        self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP))
+                        self.connection_done.emit(True)
+                        return
+
+        for i in range(0, 100):
+            IP = "192.168.1." + str(i)
+
+            self.GUI.print_('Testing IP address: ' + IP)
+
+            msg = "connected"
+            self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+            [success, data] = self.GUI.udp_socket.receiveData(
+                timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
+            if success:
+                if data[0] == msg:
+                    self.GUI.IP = data[1][0]
+                    # double check the IP address
+                    self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+                    [success, data] = self.GUI.udp_socket.receiveData(
+                        timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
+                    if success:
+                        if data[0] == msg and self.GUI.IP == data[1][0]:
+                            self.GUI.IP = data[1][0]
+                            self.GUI.print_("The IP address of Jonnhy Robot is " + IP)
+                            self.connection_done.emit(True)
+                            break
+
+        if IP == "192.168.1.99":
+            self.GUI.print_("Failed  to connect to jonny robot, either it is turn off or not UDP socket has been created")
+            self.connection_done.emit(False)
 
 
 def main():
