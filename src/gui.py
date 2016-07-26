@@ -45,6 +45,20 @@ class JRI(QtGui.QWidget):
 
         self.IP = ""
 
+        # set properties for the buttons
+        self.w_pressed = False
+        self.w_released = True
+        self.a_pressed = False
+        self.a_released = True
+        self.s_pressed = False
+        self.s_released = True
+        self.d_pressed = False
+        self.d_released = True
+        self.minus_pressed = False
+        self.minus_released = True
+        self.plus_pressed = False
+        self.plus_released = True
+
         self.picamera_frame = Image.open('img/jri_logo.png')
         self.connection_port = 2525
         self.connected_to_robot = False
@@ -71,6 +85,8 @@ class JRI(QtGui.QWidget):
         self.pic.setToolTip('Image seen by the webcam')
         #self.timer.timeout.connect(self.updateImageCV)
         self.timer.timeout.connect(self.updateImage)
+        self.timer.timeout.connect(self.updateKeys)
+
 
         self.btn = QtGui.QPushButton('Exit', self)
         self.btn.setToolTip('Close the GUI')
@@ -266,23 +282,67 @@ class JRI(QtGui.QWidget):
 
     def keyPressEvent(self, e):
         if e.key() == QtCore.Qt.Key_W:
-            self.print_('pressed W')
+            #self.print_('pressed W')
+            self.w_pressed = True
+            self.w_released = False
         elif e.key() == QtCore.Qt.Key_S:
-            self.print_( 'pressed S')
+            # self.print_( 'pressed S')
+            self.s_pressed = True
+            self.s_released = False
         elif e.key() == QtCore.Qt.Key_A:
-            self.print_( 'pressed A')
+            # self.print_( 'pressed A')
+            self.a_pressed = True
+            self.a_released = False
         elif e.key() == QtCore.Qt.Key_D:
-            self.print_( 'pressed D')
+            # self.print_( 'pressed D')
+            self.d_pressed = True
+            self.d_released = False
         elif e.key() == QtCore.Qt.Key_Minus:
-            self.print_( 'Reducing speed')
-            self.sld.setValue(self.sld.value() - 1)
+            # self.print_( 'Reducing speed')
+            self.minus_pressed = True
+            self.minus_released = False
+            #self.sld.setValue(self.sld.value() - 1)
         elif e.key() == QtCore.Qt.Key_Plus:
-            self.print_( 'Increasing speed')
-            self.sld.setValue(self.sld.value() + 1)
+            # self.print_( 'Increasing speed')
+            self.plus_pressed = True
+            self.plus_released = False
+            #self.sld.setValue(self.sld.value() + 1)
+
         """
         NOTE: to make a 2 key press you have to set for each keypress save the key,
         and if it is realeased delete it
         """
+
+
+    def keyReleaseEvent(self, e):
+        if e.key() == QtCore.Qt.Key_W:
+            self.w_pressed = False
+            self.w_released = True
+        elif e.key() == QtCore.Qt.Key_S:
+            self.s_pressed = False
+            self.s_released = True
+        elif e.key() == QtCore.Qt.Key_A:
+            self.a_pressed = False
+            self.a_released = True
+        elif e.key() == QtCore.Qt.Key_D:
+            self.d_pressed = False
+            self.d_released = True
+        elif e.key() == QtCore.Qt.Key_Minus:
+            self.minus_pressed = False
+            self.minus_released = True
+        elif e.key() == QtCore.Qt.Key_Plus:
+            self.plus_pressed = False
+            self.plus_released = True
+
+    def updateKeys(self):
+        if self.w_pressed and not self.w_released:
+            self.print_('W pressed')
+        if self.a_pressed and not self.a_released:
+            self.print_('A pressed')
+        if self.d_pressed and not self.d_released:
+            self.print_('D pressed')
+        if self.s_pressed and not self.s_released:
+            self.print_('S pressed')
 
     @QtCore.pyqtSlot()
     def openSettings(self):
@@ -439,14 +499,14 @@ class ConnectToRobot(QtCore.QThread):
         self.GUI.print_('Testing IP address: ' + str(IP))
 
         msg = "connected"
-        self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+        self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
         [success, data] = self.GUI.udp_socket.receiveData(
             timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
         if success:
             if data[0] == msg:
                 self.GUI.IP = data[1]
                 # double check the IP address
-                self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+                self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
                 [success, data] = self.GUI.udp_socket.receiveData(
                     timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
                 if success:
@@ -462,14 +522,14 @@ class ConnectToRobot(QtCore.QThread):
             self.GUI.print_('Testing IP address: ' + IP)
 
             msg = "connected"
-            self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+            self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
             [success, data] = self.GUI.udp_socket.receiveData(
                 timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
             if success:
                 if data[0] == msg:
                     self.GUI.IP = data[1][0]
                     # double check the IP address
-                    self.GUI.udp_socket.sentData(msg, IP=IP, port=self.GUI.connection_port)
+                    self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
                     [success, data] = self.GUI.udp_socket.receiveData(
                         timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
                     if success:

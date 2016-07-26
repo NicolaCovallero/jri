@@ -33,9 +33,9 @@ class UDPSocket:
             client.sendData(2,IP)
     You need to know the IP.
     """
-    def __init__(self,IP="", socket_ = None):
+    def __init__(self, IP="", socket_=None, print_errors=False):
 
-        self.print_errors = False
+        self.print_errors = print_errors
 
         self.IP = IP
         #self.client = socket.socket()  # Create a socket object
@@ -113,13 +113,13 @@ class UDPSocket:
             print 'Connection failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
             return False
 
-    def sentData(self, *args, **kwds):
+    def sendData(self, *args, **kwds):
         """
         Sent data to a specific address.
         There are three admissible ways to call this funciton:
-        socket.sentData(data, IP = addr[0], PORT = addr[1]) # full address specification
-        socket.sentData(data, IP = addr[0]) # the port used will be the default saved in the socket
-        socket.sentData(data, ADDR = addr) # full address specification (here it is defined as a tuple(IP,PORT) )
+        socket.sendData(data, IP = addr[0], PORT = addr[1]) # full address specification
+        socket.sendData(data, IP = addr[0]) # the port used will be the default saved in the socket
+        socket.sendData(data, ADDR = addr) # full address specification (here it is defined as a tuple(IP,PORT) )
 
         :param args: Only one element which is the data to send
         :param kwds: keywords
