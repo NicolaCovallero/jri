@@ -31,8 +31,12 @@ class JRI(QtGui.QWidget):
         self.max_speed = 100
         self.min_speed = 70
         self.timeout = 0.05 # timeout for the socket test conection
-
+        self.speed = 0
         self.udp_socket = udpsocket.UDPSocket()
+
+        self.driving_socket = udpsocket.UDPSocket()
+        self.DRIVING_PORT = 2526
+
 
         self.time_last_frame = 0
 
@@ -177,6 +181,7 @@ class JRI(QtGui.QWidget):
 
     def changeValue(self, value):
         str_ = 'Velocity: \n' + str(value)
+        self.speed = value
         self.velocity_label.setText(str_)
 
     def connect(self):
@@ -301,18 +306,12 @@ class JRI(QtGui.QWidget):
             # self.print_( 'Reducing speed')
             self.minus_pressed = True
             self.minus_released = False
-            #self.sld.setValue(self.sld.value() - 1)
+            self.sld.setValue(self.sld.value() - 1)
         elif e.key() == QtCore.Qt.Key_Plus:
             # self.print_( 'Increasing speed')
             self.plus_pressed = True
             self.plus_released = False
-            #self.sld.setValue(self.sld.value() + 1)
-
-        """
-        NOTE: to make a 2 key press you have to set for each keypress save the key,
-        and if it is realeased delete it
-        """
-
+            self.sld.setValue(self.sld.value() + 1)
 
     def keyReleaseEvent(self, e):
         if e.key() == QtCore.Qt.Key_W:
@@ -337,12 +336,25 @@ class JRI(QtGui.QWidget):
     def updateKeys(self):
         if self.w_pressed and not self.w_released:
             self.print_('W pressed')
+            if self.connected_to_RP:
+                self.driving_socket.sendData("forward-"+str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.a_pressed and not self.a_released:
             self.print_('A pressed')
+            if self.connected_to_RP:
+                self.driving_socket.sendData("left-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.d_pressed and not self.d_released:
             self.print_('D pressed')
+            if self.connected_to_RP:
+                self.driving_socket.sendData("right-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.s_pressed and not self.s_released:
             self.print_('S pressed')
+            if self.connected_to_RP:
+                self.driving_socket.sendData("backward-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
+        # if self.plus_pressed and not self.plus_released:
+        #
+        #     self.sld.setValue(self.sld.value() + 1)
+        # if self.minus_pressed and not self.minus_released:
+        #     self.sld.setValue(self.sld.value() - 1)
 
     @QtCore.pyqtSlot()
     def openSettings(self):
@@ -385,8 +397,10 @@ class JRI(QtGui.QWidget):
         print 'Data: ', data
         if data:
             self.pbtn.setStyleSheet("background-color: green")
+            self.connected_to_RP = True
         else:
             self.pbtn.setStyleSheet("background-color: red")
+            self.connected_to_RP = False
 
     def print_(self,text):
         print text
