@@ -92,7 +92,7 @@ class SettingsWindow(QtGui.QDialog):
         # MAIN WINDOW
         self.setLayout(layout)
         self.setGeometry(300, 300, 300, 300) # x origin, y origin, width, heght of the window
-        self.setWindowIcon(QtGui.QIcon('img/Settings-L-icon.png'))
+        self.setWindowIcon(QtGui.QIcon('../img/Settings-L-icon.png'))
         self.setWindowTitle('Settings')
 
     def WIFICheckboxClicked(self):

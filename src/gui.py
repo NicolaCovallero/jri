@@ -63,7 +63,7 @@ class JRI(QtGui.QWidget):
         # ------------------------------------------------
 
         # Default image when no image is received
-        self.picamera_frame = Image.open('img/jri_logo.png')
+        self.picamera_frame = Image.open('../img/jri_logo.png')
 
 
         # save the threads
@@ -127,7 +127,7 @@ class JRI(QtGui.QWidget):
         self.sonar_pic = QtGui.QLabel(self)
         self.sonar_pic.setGeometry(640, self.pbtn.height() + self.btn.height() + self.sld.height() + 10, 90, 59)
         # use full ABSOLUTE path to the image, not relative
-        self.sonar_pic.setPixmap(QtGui.QPixmap(os.getcwd() + "/img/sonar_cropped2.png"))
+        self.sonar_pic.setPixmap(QtGui.QPixmap(os.getcwd() + "../img/sonar_cropped2.png"))
         self.sonar_pic.setToolTip('Sonar')
 
         # --------------- SIMPLE MENUBAR --------------------------
@@ -167,7 +167,7 @@ class JRI(QtGui.QWidget):
         self.setGeometry(300, 300, window_width , window_height)# size + position of the widget
         self.center()
         self.setWindowTitle('JRI - Jonny Robot Interface')
-        self.setWindowIcon(QtGui.QIcon('img/jri_logo.png'))
+        self.setWindowIcon(QtGui.QIcon('../img/jri_logo.png'))
         self.setFixedSize(window_width,window_height)
         self.show()
 
