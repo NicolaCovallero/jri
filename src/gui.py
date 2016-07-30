@@ -11,10 +11,10 @@ Simple GUI for my robot.
 
 import os, sys
 from PyQt4 import QtGui, QtCore
+import settingswindow, connection2robot
 import cv, cv2
 import udpsocket
 import time
-import matplotlib.image as mpimg
 from PIL import Image
 import numpy
 
@@ -23,33 +23,31 @@ class JRI(QtGui.QWidget):
     # TODO create docstrings
     def __init__(self):
 
-
         super(JRI, self).__init__()
-        self.counter = 1 # silly thing, only for testing in the UpdateImage method
-        self.image = 1 # the same of the one above
+
         # properties
         self.max_speed = 100
         self.min_speed = 70
         self.timeout = 0.05 # timeout for the socket test conection
-        self.speed = 0
-        self.udp_socket = udpsocket.UDPSocket()
+        self.speed = 0 # TODO: use it
+        self.communication_style = 'WIFI' # WIFI or BLUETOOTH
+
+
+        # COMMUNICATIONS --------------------------------------------
+        # Socket used only to establish connection with the robot
+        self.connection_socket = udpsocket.UDPSocket()
+        self.CONNECTION_PORT = 2525
 
         self.driving_socket = udpsocket.UDPSocket()
         self.DRIVING_PORT = 2526
-
+        # -----------------------------------------------------------
 
         self.time_last_frame = 0
 
-        # self.camera_index = 0
-        # self.capture = cv.CaptureFromCAM(self.camera_index)
-        # cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_WIDTH, 1280)
-        # cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_HEIGHT, 720)
-
-        self.connected_to_RP = False
-
+        self.connected_to_robot = False
         self.IP = ""
 
-        # set properties for the buttons
+        # set properties for the buttons -----------------
         self.w_pressed = False
         self.w_released = True
         self.a_pressed = False
@@ -62,12 +60,16 @@ class JRI(QtGui.QWidget):
         self.minus_released = True
         self.plus_pressed = False
         self.plus_released = True
+        # ------------------------------------------------
 
+        # Default image when no image is received
         self.picamera_frame = Image.open('img/jri_logo.png')
-        self.connection_port = 2525
-        self.connected_to_robot = False
-        self.initUI()  # creation of the gui
 
+
+        # save the threads
+        self.threads = []  # <---- IMPORTANT TO PUT
+
+        self.initUI()  # creation of the gui
 
     def initUI(self):
 
@@ -94,7 +96,6 @@ class JRI(QtGui.QWidget):
 
         self.btn = QtGui.QPushButton('Exit', self)
         self.btn.setToolTip('Close the GUI')
-        #self.btn.clicked.connect(QtCore.QCoreApplication.instance().quit) # connect to the quit function
         self.btn.clicked.connect(self.closeButtonEvent)
         self.btn.resize(self.btn.sizeHint())
         self.btn.move(640, 0)
@@ -128,12 +129,6 @@ class JRI(QtGui.QWidget):
         # use full ABSOLUTE path to the image, not relative
         self.sonar_pic.setPixmap(QtGui.QPixmap(os.getcwd() + "/img/sonar_cropped2.png"))
         self.sonar_pic.setToolTip('Sonar')
-
-        # self.statusBar = QtGui.QStatusBar(self)
-        # self.statusBar.showMessage('Ready')
-        # self.statusBar.setGeometry(480, 0, 100, 20)
-
-
 
         # --------------- SIMPLE MENUBAR --------------------------
         self.menubar = QtGui.QMenuBar(self)
@@ -176,23 +171,32 @@ class JRI(QtGui.QWidget):
         self.setFixedSize(window_width,window_height)
         self.show()
 
-        # ------------- Secodnary Windows
-        self.settingsWindow = SettingsWindow(self)
-
     def changeValue(self, value):
+        """
+        Change value of the speed accordingly to the slidebar
+        :param value:
+        :return:
+        """
         str_ = 'Velocity: \n' + str(value)
         self.speed = value
         self.velocity_label.setText(str_)
 
     def connect(self):
-        self.threads = []  # <---- IMPORTANT TO PUT
-        connection = ConnectToRobot(self)
-        connection.connection_done.connect(self.update_connection)
+        """
+        Connect to the robot
+        :return:
+        """
+        connection = connection2robot.ConnectToRobot(self)
+        connection.connection_done.connect(self.update_connection) # this is called when a signal is emitted by such a thread
         self.threads.append(connection)
-        connection.start()
+        connection.start() # start the thread
 
     def closeEvent(self, event):# this is the reimplementation of the default closeEvent of QtGui
-
+        """
+        Message window before to close
+        :param event:
+        :return:
+        """
         reply = QtGui.QMessageBox.question(self, 'Message',
                                            "Are you sure to quit?", QtGui.QMessageBox.Yes |
                                            QtGui.QMessageBox.No, QtGui.QMessageBox.No)
@@ -203,6 +207,11 @@ class JRI(QtGui.QWidget):
             event.ignore()
 
     def closeButtonEvent(self, event):  # this is the reimplementation of the default closeEvent of QtGui
+        """
+        Close button event.
+        :param event:
+        :return:
+        """
 
         reply = QtGui.QMessageBox.question(self, 'Message',
                                            "Are you sure to quit?", QtGui.QMessageBox.Yes |
@@ -213,6 +222,10 @@ class JRI(QtGui.QWidget):
 
 
     def center(self):
+        """
+        Center the window in the display
+        :return:
+        """
 
         qr = self.frameGeometry()
         cp = QtGui.QDesktopWidget().availableGeometry().center()
@@ -220,6 +233,10 @@ class JRI(QtGui.QWidget):
         self.move(qr.topLeft())
 
     def updateImageCV(self):
+        """
+        Update the image in the case the image is provided as IplImage (only for test this will be deleted)
+        :return:
+        """
         self.frame = cv.QueryFrame(self.capture)
         self.resize_frame = cv.CreateMat(480, 640, cv.CV_8UC3)
         cv.Resize(self.frame, self.resize_frame)
@@ -228,11 +245,11 @@ class JRI(QtGui.QWidget):
         pixmap = QtGui.QPixmap.fromImage(image)
         self.pic.setPixmap(pixmap)
 
-    def PIL2array(self,img):
-        return numpy.array(img.getdata(),
-                           numpy.uint8).reshape(img.size[1], img.size[0], 3)
-
     def updateImage(self):
+        """
+        Update the image
+        :return:
+        """
 
         #self.counter = self.counter + 1
         #print "updating Image", self.counter
@@ -269,6 +286,7 @@ class JRI(QtGui.QWidget):
         size = QtCore.QSize(640,480)
         image = image.scaled(size)
 
+
         #
         # image = QtGui.QImage(self.resize_frame.shape[1],self.resize_frame.shape[0], QtGui.QImage.Format_RGB888)
         #
@@ -278,6 +296,7 @@ class JRI(QtGui.QWidget):
         #         image.setPixel(x,y,c.rgb())
         # print "To convert the image took", time.time() - time_
 
+        # the folliwng two lines are only usefull to check that the image is actually good, and that the problem is only during the QImage
         #cv2.imshow('image', a.astype(numpy.uint8))
         #cv2.waitKey()
 
@@ -358,12 +377,18 @@ class JRI(QtGui.QWidget):
 
     @QtCore.pyqtSlot()
     def openSettings(self):
-        print 'Opening settings'
+        self.settingsWindow = settingswindow.SettingsWindow(self) # This is important, in this way
+        # we reset the window, otherwise if we open again the window we are not creating a new class but
+        # visualize the window of before, which has been hidden. 
         self.settingsWindow.IP_input.setText(str(self.IP))
         self.settingsWindow.exec_()
         pass
 
     def getData(self):
+        """
+        Get data from the raspbarry (Sonar and Camera frame)
+        :return:
+        """
         # TODO these two sockets are the same and are waiting for different data, we should use just one
         # and add a code to specify the kind of data it has been sent
         # When we send a data we can specify the kind of port (In the rasp the socket has been binded)
@@ -371,12 +396,12 @@ class JRI(QtGui.QWidget):
         # http://stackoverflow.com/questions/8994937/send-image-using-socket-programming-python
 
         self.threads = [] # <---- IMPORTANT TO PUT
-        receiveDataSonar = ReceiveData(self.udp_socket,self.timeout)
+        receiveDataSonar = ReceiveData(self.connection_socket, self.timeout)
         receiveDataSonar.data_received.connect(self.data_received_sonar)
         self.threads.append(receiveDataSonar)
         #receiveDataSonar.start()
 
-        receiveDatacamera = ReceiveData(self.udp_socket, self.timeout, 40*8192)
+        receiveDatacamera = ReceiveData(self.connection_socket, self.timeout, 40 * 8192)
         receiveDatacamera.data_received.connect(self.data_received_camera)
         self.threads.append(receiveDatacamera)
         receiveDatacamera.start()
@@ -394,84 +419,21 @@ class JRI(QtGui.QWidget):
 
     def update_connection(self, data):
         self.connected_to_robot = data
-        print 'Data: ', data
         if data:
             self.pbtn.setStyleSheet("background-color: green")
-            self.connected_to_RP = True
         else:
             self.pbtn.setStyleSheet("background-color: red")
-            self.connected_to_RP = False
 
-    def print_(self,text):
-        print text
+    def print_(self,text, terminal = True):
+        """
+        Print text in the terminal and in the textlog as well
+        :param text:
+        :param terminal: False if you do not want to print in the terminal
+        :return:
+        """
+        if terminal: print text
         self.textLog.append(text)
         self.textLog.moveCursor(QtGui.QTextCursor.End)
-
-
-
-# reference: http://stackoverflow.com/questions/13517568/how-to-create-new-pyqt4-windows-from-an-existing-window
-class SettingsWindow(QtGui.QDialog):
-    def __init__(self, parent=None):
-        super(SettingsWindow, self).__init__(parent)
-        self.IP = ""
-        self.parent = parent
-        self.initUI()
-
-
-    def initUI(self):
-
-        self.apply_btn = QtGui.QPushButton("Apply")
-        self.apply_btn.clicked.connect(self.applyChanges)
-        self.cancel_btn = QtGui.QPushButton("Cancel")
-        self.cancel_btn.clicked.connect(self.cancelBtn)
-        #self.btn.clicked.connect(self.getItem)
-        layout = QtGui.QFormLayout()
-        layout.addRow(self.cancel_btn, self.apply_btn)
-
-        # IP address -----------------------------
-        self.IP_label = QtGui.QLabel(self)
-        self.IP_label.setText('IP:')
-        self.IP_input = QtGui.QLineEdit()
-        self.IP_input.setText(self.IP)
-        layout.addRow(self.IP_label, self.IP_input)
-        # ----------------------------------------
-
-        # minimum velocity -----------------------
-        self.min_speed_label = QtGui.QLabel(self)
-        self.min_speed_label.setText('Minimum speed:')
-        self.min_speed_label.setToolTip('Minimum PWM value to make the motors work. This should be tune for each Robot (pair of motors )')
-        self.min_speed_input = QtGui.QLineEdit()
-        self.min_speed_input.setText(str(self.parent.min_speed))
-        layout.addRow(self.min_speed_label, self.min_speed_input)
-        # ----------------------------------------
-
-        # minimum velocity -----------------------
-        self.timeout_label = QtGui.QLabel(self)
-        self.timeout_label.setText('Timeout:')
-        self.timeout_label.setToolTip(
-            'Timeout value for testing the connection with RPI, bigger it is better it is, but more time to find the Jonny Robot in the Network')
-        self.timeout_input = QtGui.QLineEdit()
-        self.timeout_input.setText(str(self.parent.timeout))
-        layout.addRow(self.timeout_label, self.timeout_input)
-        # ----------------------------------------
-
-
-        # MAIN WINDOW
-        self.setLayout(layout)
-        self.setGeometry(300, 300, 300, 300)
-        self.setWindowIcon(QtGui.QIcon('img/Settings-L-icon.png'))
-        self.setWindowTitle('Settings')
-
-    def applyChanges(self):
-
-        self.parent.IP = self.IP_input.text()
-        self.parent.min_speed = int(self.min_speed_input.text())
-        self.parent.sld.setMinimum(self.parent.min_speed)
-        self.parent.timeout = float(self.timeout_input.text())
-        self.close()
-
-    def cancelBtn(self):
-        self.close()
 
 
 class ReceiveData(QtCore.QThread):
@@ -495,67 +457,7 @@ class ReceiveData(QtCore.QThread):
                 print 'Data NOT received'
 
 
-class ConnectToRobot(QtCore.QThread):
-    # reference: http://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt
-    connection_done = QtCore.pyqtSignal(object) # this is a signal
 
-    def __init__(self, GUI):
-        QtCore.QThread.__init__(self)
-        self.GUI = GUI # main window
-
-    def run(self):
-        self.GUI.print_("\n --------------------------------------------- \n CONNECTING TO JONNY ROBOT ")
-        self.GUI.print_(" ---------------------------------------------")
-        self.GUI.print_ ("The current IP saved in the system is: " + str(self.GUI.IP))
-
-        IP =self.GUI.IP
-
-        self.GUI.print_('Testing IP address: ' + str(IP))
-
-        msg = "connected"
-        self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
-        [success, data] = self.GUI.udp_socket.receiveData(
-            timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
-        if success:
-            if data[0] == msg:
-                self.GUI.IP = data[1]
-                # double check the IP address
-                self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
-                [success, data] = self.GUI.udp_socket.receiveData(
-                    timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
-                if success:
-                    if data[0] == msg and self.GUI.IP == data[1]:
-                        self.GUI.IP = data[1][0]
-                        self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP))
-                        self.connection_done.emit(True)
-                        return
-
-        for i in range(0, 100):
-            IP = "192.168.1." + str(i)
-
-            self.GUI.print_('Testing IP address: ' + IP)
-
-            msg = "connected"
-            self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
-            [success, data] = self.GUI.udp_socket.receiveData(
-                timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
-            if success:
-                if data[0] == msg:
-                    self.GUI.IP = data[1][0]
-                    # double check the IP address
-                    self.GUI.udp_socket.sendData(msg, IP=IP, port=self.GUI.connection_port)
-                    [success, data] = self.GUI.udp_socket.receiveData(
-                        timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
-                    if success:
-                        if data[0] == msg and self.GUI.IP == data[1][0]:
-                            self.GUI.IP = data[1][0]
-                            self.GUI.print_("The IP address of Jonnhy Robot is " + IP)
-                            self.connection_done.emit(True)
-                            break
-
-        if IP == "192.168.1.99":
-            self.GUI.print_("Failed  to connect to jonny robot, either it is turn off or not UDP socket has been created")
-            self.connection_done.emit(False)
 
 
 def main():

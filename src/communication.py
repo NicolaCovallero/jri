@@ -14,12 +14,13 @@ __author__ = "Nicola Covallero"
 
 import socket               # Import socket module
 import sys
+import bluetooth
 
 
 
-class UDPSocket:
+class Socket:
     """
-    This class allows define easily the UDP sockets communications.
+    This class allows define easily the UDP sockets communications or Bluetooth sockets.
 
     Basic usage:
     1) Create a connection(server) by binding the socket to a IP and PORT
@@ -33,7 +34,9 @@ class UDPSocket:
             client.sendData(2,IP)
     You need to know the IP.
     """
-    def __init__(self, IP="", socket_=None, print_errors=False):
+    def __init__(self, use_bluetooth = False, IP="", socket_=None, print_errors=False):
+
+        self.use_bluetooth = use_bluetooth
 
         self.print_errors = print_errors
 
@@ -45,8 +48,10 @@ class UDPSocket:
         # create dgram udp socket
         if socket_ is None:
             try:
-                self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                #self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                if use_bluetooth:
+                    self.socket = bluetooth.BluetoothSocket(RFCOMM)
+                else:
+                    self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             except socket.error:
                 print 'Failed to create socket'
                 sys.exit()
@@ -99,6 +104,13 @@ class UDPSocket:
     #     elif self.binded:
     #         print "Exit - Trying to accept a connection when the socket was not binded. Call the bind() method before."
 
+    def find_service(self, uuid, addr = None ):
+        if not self.use_bluetooth:
+            print 'Error: impossible finding service since this is an UDP socket'
+        if addr == None:
+            print 'Searching for all nearby devices'
+
+        self.socket = bluetooth.find_service( uuid = uuid, address = addr )
 
     def connect(self,port = None, IP = None):
         if IP is None:
@@ -171,6 +183,3 @@ if __name__ == '__main__':
     server.bind(1234,'')
 
     server.closeSocket()
-
-
-
