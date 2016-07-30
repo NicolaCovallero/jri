@@ -5,6 +5,7 @@
 Nicola Covallero
 
 Simple GUI for my robot.
+A nice tutorial: http://www.python.it/wiki/show/qttutorial/
 """
 
 # https://pythonspot.com/en/pyqt4/
@@ -17,6 +18,8 @@ import udpsocket
 import time
 from PIL import Image
 import numpy
+
+
 
 
 class JRI(QtGui.QWidget):
@@ -74,6 +77,7 @@ class JRI(QtGui.QWidget):
     def initUI(self):
 
         QtGui.QToolTip.setFont(QtGui.QFont('SansSerif', 10))
+        layout = QtGui.QFormLayout()
 
 
         # ref: http://stackoverflow.com/questions/29807201/update-qwidget-every-minutes
@@ -81,94 +85,121 @@ class JRI(QtGui.QWidget):
         self.timer.setInterval(100)  # 200ms of interval
         self.timer.start(0)
 
+        # set tooltip of the GUI
         self.setToolTip('This is a GUI developed in PyQt for the Jonny Robot. (STILL IN DEVELOPMENT')
+
+        # # --------------- SIMPLE MENUBAR --------------------------
+        # self.menubar = QtGui.QMenuBar(self)
+        # #self.menubar.setGeometry(0, 480, 200, 50)
+        #
+        # self.fileMenu = self.menubar.addMenu('&File')
+        # exitAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&Exit', self)
+        # exitAction.setShortcut('Ctrl+Q')
+        # exitAction.setStatusTip('Exit application')
+        # exitAction.triggered.connect(QtGui.qApp.quit)
+        # self.fileMenu.addAction(exitAction)
+        #
+        # #self.fileMenu = self.menubar.addMenu('&Settings')
+        # settingsAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&Settings', self)
+        # settingsAction.setShortcut('Ctrl+O')
+        # settingsAction.setStatusTip('Open settings')
+        # settingsAction.triggered.connect(self.openSettings)
+        # self.fileMenu.addAction(settingsAction)
+        #
+        # testAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&TestThread', self)
+        # testAction.triggered.connect(self.getData)
+        # self.fileMenu.addAction(testAction)
+        # # ---------------------------------------------------------
+
+        quit = QtGui.QAction(QtGui.QIcon("../img/cancel.ico"), "Quit", self)
+        quit.setShortcut("Ctrl+Q")
+        quit.setStatusTip("Quit application")
+        quit.triggered.connect(self.closeButtonEvent)
+        settings = QtGui.QAction(QtGui.QIcon("../img/Settings-L-icon.png"), "Settings", self)
+        settings.setShortcut("Ctrl+O")
+        settings.setStatusTip("Settings window")
+        settings.triggered.connect(self.openSettings)
+        self.connection = QtGui.QAction(QtGui.QIcon("../img/wifi-icon-off.png"), "Connect", self)
+        self.connection.setShortcut("Ctrl+C")
+        self.connection.setToolTip("Connect to the robot - OFF")
+        self.connection.triggered.connect(self.connect)
 
         # image
         self.pic = QtGui.QLabel(self)
-        self.pic.setGeometry(0, 0, 640, 480)
+        self.pic.resize(640,480)
         # use full ABSOLUTE path to the image, not relative
         self.pic.setPixmap(QtGui.QPixmap(os.getcwd() + "/img/logo.png"))
         self.pic.setToolTip('Image seen by the webcam')
+        self.pic.setSizePolicy(QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Preferred)
         #self.timer.timeout.connect(self.updateImageCV)
         self.timer.timeout.connect(self.updateImage)
         self.timer.timeout.connect(self.updateKeys)
 
-
-        self.btn = QtGui.QPushButton('Exit', self)
-        self.btn.setToolTip('Close the GUI')
-        self.btn.clicked.connect(self.closeButtonEvent)
-        self.btn.resize(self.btn.sizeHint())
-        self.btn.move(640, 0)
-
-        self.pbtn = QtGui.QPushButton('Connect', self)
-        self.pbtn.setStyleSheet("background-color: red")
-        self.pbtn.setToolTip('Connect to the Raspberry by testing all the possible IPs')
-        self.pbtn.clicked.connect(self.connect)
-        self.pbtn.resize(self.btn.sizeHint())
-        self.pbtn.move(640, self.btn.height())
-
         # SLIDER
         self.sld = QtGui.QSlider(QtCore.Qt.Vertical, self)
         self.sld.setFocusPolicy(QtCore.Qt.NoFocus)
-        self.sld.setGeometry(640,self.pbtn.height() + self.btn.height() , 30,100)
+        self.sld.setFixedHeight(200)
         self.sld.setMinimum(self.min_speed)
         self.sld.setMaximum(self.max_speed)
         self.sld.setValue((self.max_speed + self.min_speed)/2)
         self.sld.setTickInterval(50)
         self.sld.setTickPosition(QtGui.QSlider.TicksLeft)
-        # VELOCITY LABEL (Connectede to slider)
+
+        # VELOCITY LABEL (Connected to slider)
         self.velocity_label = QtGui.QLabel(self)
         self.velocity_label.setText('Velocity: \n' + str(self.sld.value()))
-        self.velocity_label.setGeometry(640 + self.sld.width(), self.pbtn.height() + self.btn.height(), 100, 100)
+        #self.velocity_label.setGeometry(640 + self.sld.width(), self.pbtn.height() + self.btn.height(), 100, 100)
         self.velocity_label.setToolTip('PWM value')
         self.sld.valueChanged[int].connect(self.changeValue)
 
-        # sonar pic
-        self.sonar_pic = QtGui.QLabel(self)
-        self.sonar_pic.setGeometry(640, self.pbtn.height() + self.btn.height() + self.sld.height() + 10, 90, 59)
-        # use full ABSOLUTE path to the image, not relative
-        self.sonar_pic.setPixmap(QtGui.QPixmap(os.getcwd() + "../img/sonar_cropped2.png"))
-        self.sonar_pic.setToolTip('Sonar')
 
-        # --------------- SIMPLE MENUBAR --------------------------
-        self.menubar = QtGui.QMenuBar(self)
-        self.menubar.setGeometry(0, 480, 200, 50)
-
-        self.fileMenu = self.menubar.addMenu('&File')
-        exitAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&Exit', self)
-        exitAction.setShortcut('Ctrl+Q')
-        exitAction.setStatusTip('Exit application')
-        exitAction.triggered.connect(QtGui.qApp.quit)
-        self.fileMenu.addAction(exitAction)
-
-        #self.fileMenu = self.menubar.addMenu('&Settings')
-        settingsAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&Settings', self)
-        settingsAction.setShortcut('Ctrl+O')
-        settingsAction.setStatusTip('Open settings')
-        settingsAction.triggered.connect(self.openSettings)
-        self.fileMenu.addAction(settingsAction)
-
-        testAction = QtGui.QAction(QtGui.QIcon('exit.png'), '&TestThread', self)
-        testAction.triggered.connect(self.getData)
-        self.fileMenu.addAction(testAction)
-        # ---------------------------------------------------------
 
         # Text Log ------------------------------------------------
         self.textLog = QtGui.QTextEdit(self)
         self.textLog.setReadOnly(True)
-        self.textLog.setGeometry(0, 530, 640 + self.btn.width(), 100)
+        #self.textLog.setGeometry(0, 530, 640 + self.btn.width(), 100)
         self.textLog.ensureCursorVisible()
         self.textLog.setToolTip('Text log, It shows relevant information of the system.')
         # ---------------------------------------------------------
 
-        # MAIN WINDOW
-        window_width = 640 + self.btn.width()
-        window_height = 630
-        self.setGeometry(300, 300, window_width , window_height)# size + position of the widget
-        self.center()
+        # MAIN WINDOW - Layout Definition -------------------------
+        grid = QtGui.QGridLayout(self)
+
+        # toolbar
+        toolbar = QtGui.QToolBar(self)
+        toolbar.addAction(quit)
+        toolbar.addAction(settings)
+        toolbar.addAction(self.connection)
+        toolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
+
+
+        grid.addWidget(toolbar, 0, 0)
+        grid.addWidget(self.pic,1,0)
+
+        vbox1 = QtGui.QVBoxLayout()
+        hbox_speed = QtGui.QHBoxLayout()
+        hbox_speed.addWidget(self.sld)
+        hbox_speed.addWidget(self.velocity_label)
+        vbox1.addLayout(hbox_speed)
+
+        # sonar pic
+        self.sonar_pic = QtGui.QLabel(self)
+        # use full ABSOLUTE path to the image, not relative
+        self.sonar_pic.setPixmap(QtGui.QPixmap(os.getcwd() + "../img/sonar_cropped2.png"))
+        self.sonar_pic.setToolTip('Sonar')
+        vbox1.addWidget(self.sonar_pic)
+        vbox1.setAlignment(self.sonar_pic, QtCore.Qt.AlignBottom)
+
+        grid.addLayout(vbox1,0,1,2,1)
+        grid.addWidget(self.textLog,2,0,2,2)
+
+        self.setLayout(grid)
+        self.move(100,50)
         self.setWindowTitle('JRI - Jonny Robot Interface')
         self.setWindowIcon(QtGui.QIcon('../img/jri_logo.png'))
-        self.setFixedSize(window_width,window_height)
+        self.setSizePolicy(QtGui.QSizePolicy.Ignored, QtGui.QSizePolicy.Ignored)
+        #self.setFixedSize(self.width(), self.height()) # fixed size
+        #self.setFixedSize(self.sizeHint())
         self.show()
 
     def changeValue(self, value):
@@ -355,19 +386,19 @@ class JRI(QtGui.QWidget):
     def updateKeys(self):
         if self.w_pressed and not self.w_released:
             self.print_('W pressed')
-            if self.connected_to_RP:
+            if self.connected_to_robot:
                 self.driving_socket.sendData("forward-"+str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.a_pressed and not self.a_released:
             self.print_('A pressed')
-            if self.connected_to_RP:
+            if self.connected_to_robot:
                 self.driving_socket.sendData("left-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.d_pressed and not self.d_released:
             self.print_('D pressed')
-            if self.connected_to_RP:
+            if self.connected_to_robot:
                 self.driving_socket.sendData("right-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.s_pressed and not self.s_released:
             self.print_('S pressed')
-            if self.connected_to_RP:
+            if self.connected_to_robot:
                 self.driving_socket.sendData("backward-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         # if self.plus_pressed and not self.plus_released:
         #
@@ -382,6 +413,27 @@ class JRI(QtGui.QWidget):
         # visualize the window of before, which has been hidden. 
         self.settingsWindow.IP_input.setText(str(self.IP))
         self.settingsWindow.exec_()
+
+        # update
+        if self.communication_style == 'WIFI':
+            img = '../img/wifi-icon-'
+            if self.connected_to_robot:
+                self.connection.setIcon(QtGui.QIcon(img + 'on'))
+                self.connection.setToolTip("Connect to the robot - ON")
+            else:
+                self.connection.setIcon(QtGui.QIcon(img + 'off'))
+                self.connection.setToolTip("Connect to the robot - OFF")
+        elif self.communication_style == 'BLUETOOTH':
+            img = '../img/bluetooth-icon-'
+            if self.connected_to_robot:
+                self.connection.setIcon(QtGui.QIcon(img + 'on'))
+                self.connection.setToolTip("Connect to the robot - ON")
+            else:
+                self.connection.setIcon(QtGui.QIcon(img + 'off'))
+                self.connection.setToolTip("Connect to the robot - OFF")
+        else:
+            self.print_('ERROR: unrecognized communication style: ' + str(self.communication_style))
+
         pass
 
     def getData(self):
@@ -419,10 +471,20 @@ class JRI(QtGui.QWidget):
 
     def update_connection(self, data):
         self.connected_to_robot = data
+        print data
         if data:
-            self.pbtn.setStyleSheet("background-color: green")
+            self.connection.setToolTip("Connect to the robot - ON")
+            if self.communication_style == 'WIFI':
+                self.connection.setIcon(QtGui.QIcon('../img/wifi-icon-on'))
+            elif self.communication_style == 'BLUETOOTH':
+                self.connection.setIcon(QtGui.QIcon('../img/bluetooth-icon-on'))
         else:
-            self.pbtn.setStyleSheet("background-color: red")
+            self.connection.setToolTip("Connect to the robot - OFF")
+            if self.communication_style == 'WIFI':
+                self.connection.setIcon(QtGui.QIcon('../img/wifi-icon-off'))
+            elif self.communication_style == 'BLUETOOTH':
+                self.connection.setIcon(QtGui.QIcon('../img/bluetooth-icon-off'))
+
 
     def print_(self,text, terminal = True):
         """

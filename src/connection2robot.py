@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 """
 Thread to establish the connection with the robot
 """
