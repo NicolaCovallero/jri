@@ -11,7 +11,7 @@ Simple GUI for my robot.
 
 import os, sys
 from PyQt4 import QtGui, QtCore
-import settingswindow, connection2robot
+import settingswindow, connection2robot, receivedata
 import cv, cv2
 import udpsocket
 import time
@@ -396,7 +396,7 @@ class JRI(QtGui.QWidget):
         # http://stackoverflow.com/questions/8994937/send-image-using-socket-programming-python
 
         self.threads = [] # <---- IMPORTANT TO PUT
-        receiveDataSonar = ReceiveData(self.connection_socket, self.timeout)
+        receiveDataSonar = receivedata.ReceiveData(self.connection_socket, self.timeout)
         receiveDataSonar.data_received.connect(self.data_received_sonar)
         self.threads.append(receiveDataSonar)
         #receiveDataSonar.start()
@@ -434,30 +434,6 @@ class JRI(QtGui.QWidget):
         if terminal: print text
         self.textLog.append(text)
         self.textLog.moveCursor(QtGui.QTextCursor.End)
-
-
-class ReceiveData(QtCore.QThread):
-    # reference: http://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt
-    data_received = QtCore.pyqtSignal(object) # this is a signal
-
-    def __init__(self, socket,timeout,buffer_size = 1024):
-        QtCore.QThread.__init__(self)
-        self.socket = socket
-        self.timeout = timeout
-        self.buffer_size = buffer_size
-
-    def run(self):
-        while 1:
-            [success, data] = self.socket.receiveData(timeout=self.timeout, bufferSize = self.buffer_size)
-            if success:
-                print 'Data received: ' + str(data[0])
-                self.data_received.emit(data)
-            else:
-                pass
-                print 'Data NOT received'
-
-
-
 
 
 def main():
