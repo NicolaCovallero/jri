@@ -34,9 +34,7 @@ class Socket:
             client.sendData(2,IP)
     You need to know the IP.
     """
-    def __init__(self, use_bluetooth = False, IP="", socket_=None, print_errors=False):
-
-        self.use_bluetooth = use_bluetooth
+    def __init__(self, IP="", socket_=None, print_errors=False):
 
         self.print_errors = print_errors
 
@@ -48,21 +46,16 @@ class Socket:
         # create dgram udp socket
         if socket_ is None:
             try:
-                if use_bluetooth:
-                    self.socket = bluetooth.BluetoothSocket(RFCOMM)
-                else:
-                    self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             except socket.error:
                 print 'Failed to create socket'
                 sys.exit()
-
 
         else:
             self.socket = socket_
 
         self.type = "client"
         self.binded = False
-
 
     def bind(self,port = None, IP = None):
         """
@@ -104,13 +97,6 @@ class Socket:
     #     elif self.binded:
     #         print "Exit - Trying to accept a connection when the socket was not binded. Call the bind() method before."
 
-    def find_service(self, uuid, addr = None ):
-        if not self.use_bluetooth:
-            print 'Error: impossible finding service since this is an UDP socket'
-        if addr == None:
-            print 'Searching for all nearby devices'
-
-        self.socket = bluetooth.find_service( uuid = uuid, address = addr )
 
     def connect(self,port = None, IP = None):
         if IP is None:
@@ -120,7 +106,15 @@ class Socket:
 
         try:
             self.socket.connect((IP, port))
-            return True
+            return Trueon.setIcon(QtGui.QIcon('../img/wifi-icon-on'))
+            elif self.communication_style == 'BLUETOOTH':
+                self.connection.setIcon(QtGui.QIcon('../img/bluetooth-icon-on'))
+        else:
+            self.connection.setToolTip("Connect to the robot - OFF")
+            if self.communication_style == 'WIFI':
+                self.connection.setIcon(QtGui.QIcon('../img/wifi-icon-off'))
+            elif self.communication_style == 'BLUETOOTH':
+                self.connection.
         except socket.error, msg:
             print 'Connection failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
             return False
@@ -175,11 +169,170 @@ class Socket:
     def setPrintErrors(self,val):
         self.print_errors = val
 
+class BluetoothSocket:
+    """
+    This class allows define easily the UDP sockets communications or Bluetooth sockets.
+
+    Basic usage:
+    1) Create a connection(server) by binding the socket to a IP and PORT
+            server = UDPSocket()
+            server.bind(1234,'')
+    Here the client ìs a new instance of the UDPSocket class.
+    3) Now we can use the server to send data as well
+
+    4) To create a UDPSocket as a simple client:
+            client = UDPSocket(IP)
+            client.sendData(2,IP)
+    You need to know the IP.
+    """
+    def __init__(self, id=None, socket_=None, print_errors=False):
+
+        self.uuid = id
+        self.print_errors = print_errors
+
+        self.port = 2525  # Reserve a port for your service.
+
+        if socket_ is None:
+            try:
+                self.socket = bluetooth.BluetoothSocket( bluetooth.RFCOMM )
+            except socket.error:
+                print 'Failed to create socket'
+                sys.exit()
+
+        else:
+            self.socket = socket_
+
+        self.type = "client"
+        self.binded = False
+
+    def bind(self,port = None):
+        """
+        Bind the socket
+        :param port:
+        :param IP:
+        :return:
+        """
+
+        if port is None:
+            port = self.port
+
+        self.type = "server"
+        try:
+            self.socket.bind(("", port))
+            self.binded = True
+            return True
+        except socket.error, msg:
+            print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
+            self.binded = True
+            return False
+
+
+    def sendData(self, data):
+        """
+        Sent data to a specific address.
+        There are three admissible ways to call this funciton:
+        socket.sendData(data, IP = addr[0], PORT = addr[1]) # full address specification
+        socket.sendData(data, IP = addr[0]) # the port used will be the default saved in the socket
+        socket.sendData(data, ADDR = addr) # full address specification (here it is defined as a tuple(IP,PORT) )
+
+        :param args: Only one element which is the data to send
+        :param kwds: keywords
+        :return: True if no exceptions appeared.
+        """
+        try:
+            self.socket.send(data)
+            return True
+        except IOError:
+            return False
+
+    def receiveData(self, timeout = 0.1, bufferSize = 1024):
+        self.socket.settimeout(timeout)
+        d = []
+        try:
+            d = self.socket.recvfrom(bufferSize)
+            return [True,d]
+        except socket.error, msg:
+            if self.print_errors:
+                if msg[0] == "timed out":
+                        print 'Error Code : ' + str(msg[0])
+                else:
+                        print 'Error Code : ' + str(msg[0])   + ' Message ' + msg[1]
+            return [False,d]
+
+
+    def closeSocket(self):
+        self.socket.close()  # Close the socket when done
+
+    def setPrintErrors(self,val):
+        self.print_errors = val
+
+    def find_services(self, uuid, addr=None):
+        if addr == None: print 'Searching for all nearby devices'
+        else: print "Searching for SampleServer on ", addr
+
+        self.services_matches = bluetooth.find_service(uuid=uuid, address=addr)
+
+
+    def advertise_service(self,name = 'bluetooth_server'):
+        advertise_service(self.socket, name,
+                          service_id=self.uuid,
+                          service_classes=[uuid, bluetooth.SERIAL_PORT_CLASS],
+                          profiles=[bluetooth.SERIAL_PORT_PROFILE],
+                          #                   protocols = [ OBEX_UUID ]
+                          )
+    def accept(self):
+        return self.socket.accept()
+
+    def connect(self,name = None):
+
+        if self.services_matches.__len__() > 0:
+            if name == None:
+                match = self.services_matches[0]
+                port = match["port"]
+                name = match["name"]
+                host = match["host"]
+            else:
+                # check in all the service the desire done and connect to it
+                for match in self.services_matches:
+                    if match["name"] == name:
+                        port = match["port"]
+                        name = match["name"]
+                        host = match["host"]
+                        break
+            try:
+                print("connecting to \"%s\" on %s" % (name, host))
+                self.socket.connect((host, port))
+                return True
+            except IOError:
+                return False
+        else:
+            print 'No devices to connect with'
+
+    def setServiceID(self, id):
+        self.uuid = id
+
+    def listen(self, val):
+        self.socket.listen(val)
 
 if __name__ == '__main__':
-    global IP
-    IP = '192.168.1.5'  # raspberyr's IP
-    server = UDPSocket()
-    server.bind(1234,'')
+    # global IP
+    # IP = '192.168.1.5'  # raspberyr's IP
+    # server = UDPSocket()
+    # server.bind(1234,'')
+    # server.closeSocket()
 
-    server.closeSocket()
+    uuid = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+    bl_client = BluetoothSocket()
+    bl_client.find_services(uuid)
+    bl_client.connect()
+    print 'Connected'
+    while True:
+        data = raw_input()
+        if len(data) == 0: break
+        print 'sending', data
+        #bl_client.sendData(data)
+        bl_client.socket.send(data)
+
+    # sending the data is not working properly, the serfer does not receive them
+
+    bl_client.closeSocket()

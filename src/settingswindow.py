@@ -5,7 +5,7 @@ SettingsWindow
 
 Windows for the settings of the GUI
 """
-
+from __future__ import division
 __author__ = 'Nicola Covallero'
 
 from PyQt4 import QtGui, QtCore
@@ -25,6 +25,9 @@ class SettingsWindow(QtGui.QDialog):
         self.IP = ""
         self.parent = parent
         self.initUI()
+
+        self.pitch_sensibility = self.parent.pitch_sensibility
+        self.yaw_sensibility = self.parent.yaw_sensibility
 
     def initUI(self):
         """
@@ -91,9 +94,56 @@ class SettingsWindow(QtGui.QDialog):
         layout.addRow(self.bluetooth_checkbox_label, self.bluetooth_checkbox)
         # ----------------------------------------
 
+
+
+        # YAW SLIDER
+        self.yaw_sld = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.yaw_sld.setFocusPolicy(QtCore.Qt.NoFocus)
+        #self.yaw_sld.setFixedWidth(100)
+        self.yaw_sld.setMinimum(1)
+        self.yaw_sld.setMaximum(200) # maximum angle per press
+        # since I did not find way to define float values for the slide bar I consider integer values
+        # and divide them by a factor of 10, so when I read the vale from the slide bar a divide by a factor of 10
+        # while when I set up the default values of the slide bar I multyuply the sensibility by a factor of 10
+        self.yaw_sld.setValue(int(self.parent.yaw_sensibility*10))
+        self.yaw_sld.setTickInterval(1)
+        self.yaw_sld.setTickPosition(QtGui.QSlider.TicksLeft)
+
+        # YAW SLIDER'S LABEL
+        self.yaw_label = QtGui.QLabel(self)
+        self.yaw_label.setText('Yaw: ' + str(self.yaw_sld.value()/10))
+        # self.velocity_label.setGeometry(640 + self.yaw_sld.width(), self.pbtn.height() + self.btn.height(), 100, 100)
+        self.yaw_label.setToolTip('yaw sensibility angle for the robot\'s camera')
+        self.yaw_sld.valueChanged[int].connect(self.yawChangeValue)
+
+        layout.addRow(self.yaw_label, self.yaw_sld)
+
+        # PITCH SLIDER
+        self.pitch_sld = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.pitch_sld.setFocusPolicy(QtCore.Qt.NoFocus)
+        # self.yaw_sld.setFixedWidth(100)
+        self.pitch_sld.setMinimum(1)
+        self.pitch_sld.setMaximum(200)  # maximum angle per press
+        # since I did not find way to define float values for the slide bar I consider integer values
+        # and divide them by a factor of 10, so when I read the vale from the slide bar a divide by a factor of 10
+        # while when I set up the default values of the slide bar I multyuply the sensibility by a factor of 10
+        self.pitch_sld.setValue(int(self.parent.pitch_sensibility*10))
+        self.pitch_sld.setTickInterval(1)
+        self.pitch_sld.setTickPosition(QtGui.QSlider.TicksLeft)
+
+        # PITCH SLIDER'S LABEL
+        self.pitch_label = QtGui.QLabel(self)
+        self.pitch_label.setText('Pitch: ' + str(self.pitch_sld.value()/10))
+        # self.velocity_label.setGeometry(640 + self.yaw_sld.width(), self.pbtn.height() + self.btn.height(), 100, 100)
+        self.pitch_label.setToolTip('pitch sensibility angle for the robot\'s camera')
+        self.pitch_sld.valueChanged[int].connect(self.pitchChangeValue)
+
+        layout.addRow(self.pitch_label, self.pitch_sld)
+        # -----------------------------------------------------
+
         # MAIN WINDOW
         self.setLayout(layout)
-        self.setGeometry(300, 300, 300, 300) # x origin, y origin, width, heght of the window
+        self.setGeometry(300, 300, 300, 300)  # x origin, y origin, width, heght of the window
         self.setWindowIcon(QtGui.QIcon('../img/Settings-L-icon.png'))
         self.setWindowTitle('Settings')
 
@@ -123,6 +173,8 @@ class SettingsWindow(QtGui.QDialog):
         self.parent.min_speed = int(self.min_speed_input.text())
         self.parent.sld.setMinimum(self.parent.min_speed)
         self.parent.timeout = float(self.timeout_input.text())
+        self.parent.yaw_sensibility = self.yaw_sensibility
+        self.parent.pitch_sensibility = self.pitch_sensibility
         if self.bluetooth_checkbox.checkState():
             self.parent.communication_style = 'BLUETOOTH'
         else:
@@ -136,3 +188,22 @@ class SettingsWindow(QtGui.QDialog):
         """
         self.close()
 
+    def yawChangeValue(self, value):
+        """
+        Change value of the speed accordingly to the slidebar
+        :param value:
+        :return:
+        """
+        str_ = 'Yaw: ' + str(value/10)
+        self.yaw_sensibility = value/10
+        self.yaw_label.setText(str_)
+
+    def pitchChangeValue(self, value):
+        """
+        Change value of the speed accordingly to the slidebar
+        :param value:
+        :return:
+        """
+        str_ = 'Pitch: ' + str(value/10)
+        self.pitch_sensibility = value/10
+        self.pitch_label.setText(str_)

@@ -33,22 +33,30 @@ class ConnectToRobot(QtCore.QThread):
         [success, data] = self.GUI.connection_socket.receiveData(
             timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
         if success:
-            if data[0] == msg:
-                self.GUI.IP = data[1]
-                # double check the IP address
-                self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
-                [success, data] = self.GUI.connection_socket.receiveData(
-                    timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
-                if success:
-                    if data[0] == msg and self.GUI.IP == data[1]:
-                        self.GUI.IP = data[1][0]
-                        self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP)) # print in the text log
-                        self.connection_done.emit(True) # emit a signal with a boolean variable True
-                        return
+            self.GUI.print_('Connection establishd with jhonny robot :) ')
+            data_str = data[0].split("/")
+            if data_str[0] == "jr_data":
+                self.GUI.IP = data[1][0]
+                self.GUI.yaw_angle_range = float(data_str[2])
+                self.GUI.pitch_angle_range = float(data_str[4])
+                self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP))  # print in the text log
+                self.connection_done.emit(True) # emit a signal with a boolean variable True
+                return
+                # # double check the IP address
+                # self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
+                # [success, data] = self.GUI.connection_socket.receiveData(
+                #     timeout=self.GUI.timeout)  # do not set it too fast, otherwise the IP is wrong
+                # data = data.split("/")
+                # if success:
+                #     if data[0] == "jr_data" and self.GUI.IP == data[1]:
+                #         self.GUI.IP = data[1][0]
+                #         self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP)) # print in the text log
+                #         self.connection_done.emit(True) # emit a signal with a boolean variable True
+                #         return
 
         # test all the IP address from 0 -> 100 The format will be 192.168.1.#
         for i in range(0, 100):
-            IP = "192.168.1." + str(i)
+            IP = "192.168.0." + str(i)
 
             self.GUI.print_('Testing IP address: ' + IP)
 
@@ -57,19 +65,30 @@ class ConnectToRobot(QtCore.QThread):
             [success, data] = self.GUI.connection_socket.receiveData(
                 timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
             if success:
-                if data[0] == msg:
+                self.GUI.print_('Connection establishd with jhonny robot :) ')
+                data_str = data[0].split("/")
+                if data_str[0] == "jr_data":
                     self.GUI.IP = data[1][0]
-                    # double check the IP address
-                    self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
-                    [success, data] = self.GUI.connection_socket.receiveData(
-                        timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
-                    if success:
-                        if data[0] == msg and self.GUI.IP == data[1][0]:
-                            self.GUI.IP = data[1][0]
-                            self.GUI.print_("The IP address of Jonnhy Robot is " + IP)
-                            self.connection_done.emit(True)
-                            break
+                    self.GUI.yaw_angle_range = float(data_str[2])
+                    self.GUI.pitch_angle_range = float(data_str[4])
+                    self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP))  # print in the text log
+                    self.connection_done.emit(True)  # emit a signal with a boolean variable True
+                    return
+            # if success:
+            #     if data_str[0] == "jr_data" and self.GUI.IP == data[1]:
+            #         self.GUI.IP = data[1][0]
+                    # # double check the IP address
+                    # self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
+                    # [success, data] = self.GUI.connection_socket.receiveData(
+                    #     timeout=self.GUI.timeout)  # do not set it too fast, otherwise the IP is wrong
 
-        if IP == "192.168.1.99":
+                    # if success:
+                    #     if data[0] == msg and self.GUI.IP == data[1][0]:
+                    #         self.GUI.IP = data[1][0]
+                    #         self.GUI.print_("The IP address of Jonnhy Robot is " + IP)
+                    #         self.connection_done.emit(True)
+                    #         break
+
+        if IP == "192.168.0.99":
             self.GUI.print_("Failed  to connect to jonny robot, either it is turn off or not UDP socket has been created")
             self.connection_done.emit(False)

@@ -31,9 +31,17 @@ class JRI(QtGui.QWidget):
         # properties
         self.max_speed = 100
         self.min_speed = 70
-        self.timeout = 0.05 # timeout for the socket test conection
-        self.speed = 0 # TODO: use it
+        self.timeout = 0.05 # timeout for the socket test conectiona
+        self.speed = 0 #
         self.communication_style = 'WIFI' # WIFI or BLUETOOTH
+
+        # camera variables
+        self.yaw_angle = 0
+        self.pitch_angle = 0
+        self.yaw_angle_range = 180
+        self.pitch_angle_range = 180 # this expresses the range, as soon as it is connected to the robot it will get the real values
+        self.yaw_sensibility = 5.0 # in degrees
+        self.pitch_sensibility = 5.0  # in degrees
 
 
         # COMMUNICATIONS --------------------------------------------
@@ -43,12 +51,15 @@ class JRI(QtGui.QWidget):
 
         self.driving_socket = udpsocket.UDPSocket()
         self.DRIVING_PORT = 2526
+
+        self.camera_driving_socket = udpsocket.UDPSocket()
+        self.CAMERA_DRIVING_PORT = 2529
         # -----------------------------------------------------------
 
         self.time_last_frame = 0
 
         self.connected_to_robot = False
-        self.IP = ""
+        self.IP = "192.168.0.8"
 
         # set properties for the buttons -----------------
         self.w_pressed = False
@@ -59,6 +70,14 @@ class JRI(QtGui.QWidget):
         self.s_released = True
         self.d_pressed = False
         self.d_released = True
+        self.right_arrow_pressed = False
+        self.right_arrow_released = True
+        self.left_arrow_pressed = False
+        self.left_arrow_released = True
+        self.up_arrow_pressed = False
+        self.up_arrow_released = True
+        self.down_arrow_pressed = False
+        self.down_arrow_released = True
         self.minus_pressed = False
         self.minus_released = True
         self.plus_pressed = False
@@ -159,6 +178,7 @@ class JRI(QtGui.QWidget):
         self.textLog.setReadOnly(True)
         #self.textLog.setGeometry(0, 530, 640 + self.btn.width(), 100)
         self.textLog.ensureCursorVisible()
+        self.textLog.setFocusPolicy(QtCore.Qt.NoFocus) # Seeting this policy the arrow pressing the arrows does not move the cursor
         self.textLog.setToolTip('Text log, It shows relevant information of the system.')
         # ---------------------------------------------------------
 
@@ -181,6 +201,21 @@ class JRI(QtGui.QWidget):
         hbox_speed.addWidget(self.sld)
         hbox_speed.addWidget(self.velocity_label)
         vbox1.addLayout(hbox_speed)
+
+        # yaw label
+        self.yaw_label = QtGui.QLabel(self)
+        self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range/2))
+        #self.velocity_label.setGeometry(640 + self.sld.width(), self.pbtn.height() + self.btn.height(), 100, 100)
+        self.yaw_label.setToolTip('Yaw angle value')
+        # pitch label
+        self.pitch_label = QtGui.QLabel(self)
+        self.pitch_label.setText('Pitch: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
+        # self.velocity_label.setGeometry(640 + self.sld.width(), self.pbtn.height() + self.btn.height(), 100, 100)
+        self.pitch_label.setToolTip('Pitch angle value')
+        vbox1.addWidget(self.yaw_label)
+        vbox1.addWidget(self.pitch_label)
+
+
 
         # sonar pic
         self.sonar_pic = QtGui.QLabel(self)
@@ -234,6 +269,7 @@ class JRI(QtGui.QWidget):
 
         if reply == QtGui.QMessageBox.Yes:
             event.accept()
+
         else:
             event.ignore()
 
@@ -249,6 +285,11 @@ class JRI(QtGui.QWidget):
                                            QtGui.QMessageBox.No, QtGui.QMessageBox.No)
 
         if reply == QtGui.QMessageBox.Yes:
+            # send the motors to the original position
+            self.camera_driving_socket.sendData("pitch/" + str(0.0), IP=self.IP,
+                                                PORT=self.CAMERA_DRIVING_PORT)
+            self.camera_driving_socket.sendData("yaw/" + str(0.0), IP=self.IP,
+                                            PORT=self.CAMERA_DRIVING_PORT)
             QtCore.QCoreApplication.instance().quit()
 
 
@@ -362,6 +403,30 @@ class JRI(QtGui.QWidget):
             self.plus_pressed = True
             self.plus_released = False
             self.sld.setValue(self.sld.value() + 1)
+        elif e.key() == QtCore.Qt.Key_Up:
+            self.up_arrow_pressed = True
+            self.up_arrow_released = False
+            self.pitch_angle = self.pitch_angle + self.pitch_sensibility
+            self.pitchSaturation()
+            self.pitch_label.setText('PITCH: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
+        elif e.key() == QtCore.Qt.Key_Down:
+            self.down_arrow_pressed = True
+            self.down_arrow_released = False
+            self.pitch_angle = self.pitch_angle - self.pitch_sensibility
+            self.pitchSaturation()
+            self.pitch_label.setText('PITCH: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
+        elif e.key() == QtCore.Qt.Key_Right:
+            self.right_arrow_pressed = True
+            self.right_arrow_released = False
+            self.yaw_angle = self.yaw_angle + self.yaw_sensibility
+            self.yawSaturation()
+            self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range / 2))
+        elif e.key() == QtCore.Qt.Key_Left:
+            self.left_arrow_pressed = True
+            self.left_arrow_released = False
+            self.yaw_angle = self.yaw_angle - self.yaw_sensibility
+            self.yawSaturation()
+            self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range/2))
 
     def keyReleaseEvent(self, e):
         if e.key() == QtCore.Qt.Key_W:
@@ -382,22 +447,34 @@ class JRI(QtGui.QWidget):
         elif e.key() == QtCore.Qt.Key_Plus:
             self.plus_pressed = False
             self.plus_released = True
+        elif e.key() == QtCore.Qt.Key_Up:
+            self.up_arrow_pressed = False
+            self.up_arrow_released = True
+        elif e.key() == QtCore.Qt.Key_Down:
+            self.down_arrow_pressed = False
+            self.down_arrow_released = True
+        elif e.key() == QtCore.Qt.Key_Right:
+            self.right_arrow_pressed = False
+            self.right_arrow_released = True
+        elif e.key() == QtCore.Qt.Key_Left:
+            self.left_arrow_pressed = False
+            self.left_arrow_released = True
 
     def updateKeys(self):
         if self.w_pressed and not self.w_released:
-            self.print_('W pressed')
+            #self.print_('W pressed')
             if self.connected_to_robot:
                 self.driving_socket.sendData("forward-"+str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.a_pressed and not self.a_released:
-            self.print_('A pressed')
+            #self.print_('A pressed')
             if self.connected_to_robot:
                 self.driving_socket.sendData("left-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.d_pressed and not self.d_released:
-            self.print_('D pressed')
+            #self.print_('D pressed')
             if self.connected_to_robot:
                 self.driving_socket.sendData("right-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         if self.s_pressed and not self.s_released:
-            self.print_('S pressed')
+            #self.print_('S pressed')
             if self.connected_to_robot:
                 self.driving_socket.sendData("backward-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
         # if self.plus_pressed and not self.plus_released:
@@ -405,6 +482,25 @@ class JRI(QtGui.QWidget):
         #     self.sld.setValue(self.sld.value() + 1)
         # if self.minus_pressed and not self.minus_released:
         #     self.sld.setValue(self.sld.value() - 1)
+
+        # CAMERA DRIVING MOTORS
+        if self.up_arrow_pressed and not self.up_arrow_released:
+            #self.print_("Up pressed")
+            if self.connected_to_robot:
+                self.camera_driving_socket.sendData("pitch/" + str(self.pitch_angle), IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+        if self.down_arrow_pressed and not self.down_arrow_released:
+            #self.print_("Down pressed")
+            if self.connected_to_robot:
+                self.camera_driving_socket.sendData("pitch/" + str(self.pitch_angle), IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+        if self.right_arrow_pressed and not self.right_arrow_released:
+            #self.print_("Right pressed")
+            if self.connected_to_robot:
+                self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle), IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+        if self.left_arrow_pressed and not self.left_arrow_released:
+            #self.print_("Left pressed")
+            if self.connected_to_robot:
+                self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle), IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+        # -------------------------------
 
     @QtCore.pyqtSlot()
     def openSettings(self):
@@ -484,7 +580,8 @@ class JRI(QtGui.QWidget):
                 self.connection.setIcon(QtGui.QIcon('../img/wifi-icon-off'))
             elif self.communication_style == 'BLUETOOTH':
                 self.connection.setIcon(QtGui.QIcon('../img/bluetooth-icon-off'))
-
+        self.pitch_label.setText('PITCH: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
+        self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range / 2))
 
     def print_(self,text, terminal = True):
         """
@@ -496,6 +593,18 @@ class JRI(QtGui.QWidget):
         if terminal: print text
         self.textLog.append(text)
         self.textLog.moveCursor(QtGui.QTextCursor.End)
+
+    def yawSaturation(self):
+        if self.yaw_angle >= self.yaw_angle_range/2:
+            self.yaw_angle = self.yaw_angle_range / 2
+        if self.yaw_angle <= - self.yaw_angle_range / 2:
+            self.yaw_angle = - self.yaw_angle_range / 2
+
+    def pitchSaturation(self):
+        if self.pitch_angle >= self.pitch_angle_range / 2:
+            self.pitch_angle = self.pitch_angle_range / 2
+        if self.pitch_angle <= - self.pitch_angle_range / 2:
+            self.pitch_angle = - self.pitch_angle_range / 2
 
 
 def main():
