@@ -6,6 +6,7 @@ Thread to establish the connection with the robot
 __author__ = 'Nicola Covallero'
 
 from PyQt4 import QtCore
+import bluetooth
 
 class ConnectToRobot(QtCore.QThread):
     # reference: http://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt
@@ -19,47 +20,16 @@ class ConnectToRobot(QtCore.QThread):
         self.GUI = GUI # main window
 
     def run(self):
-        self.GUI.print_("\n --------------------------------------------- \n CONNECTING TO JONNY ROBOT ")
-        self.GUI.print_(" ---------------------------------------------")
-        self.GUI.print_ ("The current IP saved in the system is: " + str(self.GUI.IP))
+        if self.GUI.communication_style == "WIFI":
+            self.GUI.print_("\n --------------------------------------------- \n CONNECTING TO JONNY ROBOT via WIFI")
+            self.GUI.print_(" ---------------------------------------------")
+            self.GUI.print_ ("The current IP saved in the system is: " + str(self.GUI.IP))
 
-        IP =self.GUI.IP
+            IP =self.GUI.IP
 
-        self.GUI.print_('Testing IP address: ' + str(IP))
+            self.GUI.print_('Testing IP address: ' + str(IP))
 
-        # 1st test: here we try to connect using the current IP address
-        msg = "connected"
-        self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
-        [success, data] = self.GUI.connection_socket.receiveData(
-            timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
-        if success:
-            self.GUI.print_('Connection establishd with jhonny robot :) ')
-            data_str = data[0].split("/")
-            if data_str[0] == "jr_data":
-                self.GUI.IP = data[1][0]
-                self.GUI.yaw_angle_range = float(data_str[2])
-                self.GUI.pitch_angle_range = float(data_str[4])
-                self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP))  # print in the text log
-                self.connection_done.emit(True) # emit a signal with a boolean variable True
-                return
-                # # double check the IP address
-                # self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
-                # [success, data] = self.GUI.connection_socket.receiveData(
-                #     timeout=self.GUI.timeout)  # do not set it too fast, otherwise the IP is wrong
-                # data = data.split("/")
-                # if success:
-                #     if data[0] == "jr_data" and self.GUI.IP == data[1]:
-                #         self.GUI.IP = data[1][0]
-                #         self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP)) # print in the text log
-                #         self.connection_done.emit(True) # emit a signal with a boolean variable True
-                #         return
-
-        # test all the IP address from 0 -> 100 The format will be 192.168.1.#
-        for i in range(0, 100):
-            IP = "192.168.0." + str(i)
-
-            self.GUI.print_('Testing IP address: ' + IP)
-
+            # 1st test: here we try to connect using the current IP address
             msg = "connected"
             self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
             [success, data] = self.GUI.connection_socket.receiveData(
@@ -72,23 +42,97 @@ class ConnectToRobot(QtCore.QThread):
                     self.GUI.yaw_angle_range = float(data_str[2])
                     self.GUI.pitch_angle_range = float(data_str[4])
                     self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP))  # print in the text log
-                    self.connection_done.emit(True)  # emit a signal with a boolean variable True
+                    self.connection_done.emit(True) # emit a signal with a boolean variable True
                     return
-            # if success:
-            #     if data_str[0] == "jr_data" and self.GUI.IP == data[1]:
-            #         self.GUI.IP = data[1][0]
                     # # double check the IP address
                     # self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
                     # [success, data] = self.GUI.connection_socket.receiveData(
                     #     timeout=self.GUI.timeout)  # do not set it too fast, otherwise the IP is wrong
-
+                    # data = data.split("/")
                     # if success:
-                    #     if data[0] == msg and self.GUI.IP == data[1][0]:
+                    #     if data[0] == "jr_data" and self.GUI.IP == data[1]:
                     #         self.GUI.IP = data[1][0]
-                    #         self.GUI.print_("The IP address of Jonnhy Robot is " + IP)
-                    #         self.connection_done.emit(True)
-                    #         break
+                    #         self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP)) # print in the text log
+                    #         self.connection_done.emit(True) # emit a signal with a boolean variable True
+                    #         return
 
-        if IP == "192.168.0.99":
-            self.GUI.print_("Failed  to connect to jonny robot, either it is turn off or not UDP socket has been created")
-            self.connection_done.emit(False)
+            # test all the IP address from 0 -> 100 The format will be 192.168.1.#
+            for i in range(0, 100):
+                IP = "192.168.0." + str(i)
+
+                self.GUI.print_('Testing IP address: ' + IP)
+
+                msg = "connected"
+                self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
+                [success, data] = self.GUI.connection_socket.receiveData(
+                    timeout=self.GUI.timeout)  # do not put it too fast, otherwise the IP is wrong
+                if success:
+                    self.GUI.print_('Connection establishd with jhonny robot :) ')
+                    data_str = data[0].split("/")
+                    if data_str[0] == "jr_data":
+                        self.GUI.IP = data[1][0]
+                        self.GUI.yaw_angle_range = float(data_str[2])
+                        self.GUI.pitch_angle_range = float(data_str[4])
+                        self.GUI.print_("The IP address of Jonnhy Robot is " + str(IP))  # print in the text log
+                        self.connection_done.emit(True)  # emit a signal with a boolean variable True
+                        return
+                # if success:
+                #     if data_str[0] == "jr_data" and self.GUI.IP == data[1]:
+                #         self.GUI.IP = data[1][0]
+                        # # double check the IP address
+                        # self.GUI.connection_socket.sendData(msg, IP=IP, port=self.GUI.CONNECTION_PORT)
+                        # [success, data] = self.GUI.connection_socket.receiveData(
+                        #     timeout=self.GUI.timeout)  # do not set it too fast, otherwise the IP is wrong
+
+                        # if success:
+                        #     if data[0] == msg and self.GUI.IP == data[1][0]:
+                        #         self.GUI.IP = data[1][0]
+                        #         self.GUI.print_("The IP address of Jonnhy Robot is " + IP)
+                        #         self.connection_done.emit(True)
+                        #         break
+
+            if IP == "192.168.0.99":
+                self.GUI.print_("Failed  to connect to jonny robot, either it is turn off or not UDP socket has been created")
+                self.connection_done.emit(False)
+        elif self.GUI.communication_style == "BLUETOOTH":
+            self.GUI.print_("\n --------------------------------------------- \n CONNECTING TO JONNY ROBOT via BLUETOOTH")
+            self.GUI.print_(" ---------------------------------------------")
+            self.GUI.print_("No address specified, looking for all the addresses")
+
+            # here we do not do any test for the connection :P
+
+            self.GUI.print_("Looking for DRIVING service ... ")
+            addr = None
+            service_matches = bluetooth.find_service(uuid=self.GUI.DRIVING_SERVICE_UUID, address=addr)
+            if service_matches.__len__() > 0:
+                port = service_matches[0]["port"]
+                name = service_matches[0]["name"]
+                host = service_matches[0]["host"]
+                self.GUI.print_("The following service was found:")
+                self.GUI.print_("port: " + str(port))
+                self.GUI.print_("name: " + str(name))
+                self.GUI.print_("host: " + str(host))
+                self.GUI.driving_socket.connect((host,port))
+                self.GUI.print_("Connection with DRIVING service established")
+            else:
+                self.GUI.print_("No DRIVING service found")
+
+            # self.GUI.print_("Looking for CAMERA_DRIVING service ... ")
+            # if service_matches.__len__() > 0:
+            #     service_matches = bluetooth.find_service(uuid=self.GUI.CAMERA_DRIVING_SERVICE_UUID, address=addr)
+            #     port = service_matches[0]["port"]
+            #     name = service_matches[0]["name"]
+            #     host = service_matches[0]["host"]
+            #     self.GUI.print_("The following service was found:")
+            #     self.GUI.print_("port: " + str(port))
+            #     self.GUI.print_("name: " + str(name))
+            #     self.GUI.print_("host: " + str(host))
+            #     self.GUI.driving_socket.connect((host, port))
+            #     self.GUI.print_("Connection with CAMERA_DRIVING service established")
+            # else:
+            #     self.GUI.print_("No CAMERA_DRIVING service found")
+
+            self.GUI.connected_to_robot = True
+            self.connection_done.emit(True)
+
+            pass

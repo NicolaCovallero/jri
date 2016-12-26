@@ -107,9 +107,9 @@ class Socket:
         try:
             self.socket.connect((IP, port))
             return Trueon.setIcon(QtGui.QIcon('../img/wifi-icon-on'))
-            elif self.communication_style == 'BLUETOOTH':
+            if self.communication_style == 'BLUETOOTH':
                 self.connection.setIcon(QtGui.QIcon('../img/bluetooth-icon-on'))
-        else:
+            else:
             self.connection.setToolTip("Connect to the robot - OFF")
             if self.communication_style == 'WIFI':
                 self.connection.setIcon(QtGui.QIcon('../img/wifi-icon-off'))
@@ -333,6 +333,6 @@ if __name__ == '__main__':
         #bl_client.sendData(data)
         bl_client.socket.send(data)
 
-    # sending the data is not working properly, the serfer does not receive them
+    # sending the data is not working properly, the server does not receive them
 
     bl_client.closeSocket()
