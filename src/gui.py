@@ -299,6 +299,8 @@ class JRI(QtGui.QWidget):
                                                     PORT=self.CAMERA_DRIVING_PORT)
             else:
                 self.driving_socket.close()
+                self.camera_driving_socket.send("yaw/" + str(0.0) + "/" + "pitch/" + str(0.0))
+                self.camera_driving_socket.close()
 
             QtCore.QCoreApplication.instance().quit()
 
@@ -422,6 +424,8 @@ class JRI(QtGui.QWidget):
             if self.communication_style == 'WIFI':
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+            else:
+                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.pitch_label.setText('PITCH: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
         if e.key() == QtCore.Qt.Key_Down:
@@ -432,6 +436,8 @@ class JRI(QtGui.QWidget):
             if self.communication_style == 'WIFI':
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+            else:
+                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.pitch_label.setText('PITCH: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
         if e.key() == QtCore.Qt.Key_Right:
@@ -442,6 +448,8 @@ class JRI(QtGui.QWidget):
             if self.communication_style == 'WIFI':
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+            else:
+                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range / 2))
         if e.key() == QtCore.Qt.Key_Left:
@@ -452,6 +460,8 @@ class JRI(QtGui.QWidget):
             if self.communication_style == 'WIFI':
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
+            else:
+                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range/2))
 

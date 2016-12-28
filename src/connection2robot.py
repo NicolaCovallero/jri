@@ -104,7 +104,7 @@ class ConnectToRobot(QtCore.QThread):
             self.GUI.print_("Looking for DRIVING service ... ")
             addr = None
             service_matches = bluetooth.find_service(uuid=self.GUI.DRIVING_SERVICE_UUID, address=addr)
-            if service_matches.__len__() > 0:
+            if len(service_matches)> 0:
                 port = service_matches[0]["port"]
                 name = service_matches[0]["name"]
                 host = service_matches[0]["host"]
@@ -116,21 +116,26 @@ class ConnectToRobot(QtCore.QThread):
                 self.GUI.print_("Connection with DRIVING service established")
             else:
                 self.GUI.print_("No DRIVING service found")
+                self.connection_done.emit(False)
 
-            # self.GUI.print_("Looking for CAMERA_DRIVING service ... ")
-            # if service_matches.__len__() > 0:
-            #     service_matches = bluetooth.find_service(uuid=self.GUI.CAMERA_DRIVING_SERVICE_UUID, address=addr)
-            #     port = service_matches[0]["port"]
-            #     name = service_matches[0]["name"]
-            #     host = service_matches[0]["host"]
-            #     self.GUI.print_("The following service was found:")
-            #     self.GUI.print_("port: " + str(port))
-            #     self.GUI.print_("name: " + str(name))
-            #     self.GUI.print_("host: " + str(host))
-            #     self.GUI.driving_socket.connect((host, port))
-            #     self.GUI.print_("Connection with CAMERA_DRIVING service established")
-            # else:
-            #     self.GUI.print_("No CAMERA_DRIVING service found")
+            #TODO handle the blueetooth sockets in a better way, resetting and so on, saving on the address
+            # in order to avoid look again for the raspberry is the connection was established and still working
+
+            self.GUI.print_("Looking for CAMERA_DRIVING service ... ")
+            service_matches = bluetooth.find_service(uuid=self.GUI.CAMERA_DRIVING_SERVICE_UUID, address=addr)
+            if len(service_matches) > 0:
+                    port = service_matches[0]["port"]
+                    name = service_matches[0]["name"]
+                    host = service_matches[0]["host"]
+                    self.GUI.print_("The following service was found:")
+                    self.GUI.print_("port: " + str(port))
+                    self.GUI.print_("name: " + str(name))
+                    self.GUI.print_("host: " + str(host))
+                    self.GUI.camera_driving_socket.connect((host, port))
+                    self.GUI.print_("Connection with CAMERA_DRIVING service established")
+            else:
+                self.GUI.print_("No CAMERA_DRIVING service found")
+                self.connection_done.emit(False)
 
             self.GUI.connected_to_robot = True
             self.connection_done.emit(True)
