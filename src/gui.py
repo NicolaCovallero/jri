@@ -34,7 +34,7 @@ class JRI(QtGui.QWidget):
         self.min_speed = 70
         self.timeout = 0.05 # timeout for the socket test conectiona
         self.speed = 0 #
-        self.communication_style = 'WIFI' # WIFI or BLUETOOTH
+        self.communication_style = 'BLUETOOTH' # WIFI or BLUETOOTH
 
         # camera variables
         self.yaw_angle = 0
@@ -47,19 +47,25 @@ class JRI(QtGui.QWidget):
 
         # COMMUNICATIONS --------------------------------------------
         # Socket used only to establish connection with the robot
-        self.connection_socket = udpsocket.UDPSocket()
         self.CONNECTION_PORT = 2525
         self.CONNECTION_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ec"
 
 
-        self.driving_socket = udpsocket.UDPSocket()
         self.DRIVING_PORT = 2526
-        self.DRIVING_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ee"
+        self.DRIVING_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ed"
+        self.driving_socket_connected = False
 
-        self.camera_driving_socket = udpsocket.UDPSocket()
         self.CAMERA_DRIVING_PORT = 2529
-        self.CAMERA_DRIVING_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ea"
+        self.CAMERA_DRIVING_SERVICE_UUID = "94f39d29-7d6d-437d-973b-fba39e49d4ec"
+        self.camera_driving_socket_connected = False
         # -----------------------------------------------------------
+
+        if self.communication_style == "WIFI":
+            self.driving_socket = udpsocket.UDPSocket()
+            self.connection_socket = udpsocket.UDPSocket()
+            self.camera_driving_socket = udpsocket.UDPSocket()
+        else:
+            self.setBluetoothCommunication()
 
         self.time_last_frame = 0
 
@@ -143,7 +149,10 @@ class JRI(QtGui.QWidget):
         settings.setShortcut("Ctrl+O")
         settings.setStatusTip("Settings window")
         settings.triggered.connect(self.openSettings)
-        self.connection = QtGui.QAction(QtGui.QIcon("../img/wifi-icon-off.png"), "Connect", self)
+        if self.communication_style == "WIFI":
+            self.connection = QtGui.QAction(QtGui.QIcon("../img/wifi-icon-off.png"), "Connect", self)
+        else:
+            self.connection = QtGui.QAction(QtGui.QIcon("../img/bluetooth-icon-off.png"), "Connect", self)
         self.connection.setShortcut("Ctrl+C")
         self.connection.setToolTip("Connect to the robot - OFF")
         self.connection.triggered.connect(self.connect)
@@ -242,6 +251,37 @@ class JRI(QtGui.QWidget):
         #self.setFixedSize(self.sizeHint())
         self.show()
 
+    def sendBluetoothData(self, sock, data, ID = []):
+        """
+        handle the sending of data via Bluetooth
+        :param sock:
+        :param str:
+        :param ID: identifier of the socket
+        :return:
+        """
+        if not self.communication_style == "WIFI":
+            try:
+                sock.send(data)
+            except:
+                self.updateConnection() # update connection label
+                self.setBluetoothCommunication() # reset
+        else:
+            pass
+
+    def updateConnection(self, val = False):
+        if not val:
+            self.connected_to_robot = False
+            if self.communication_style == "WIFI":
+                self.connection.setIcon(QtGui.QIcon('../img/wifi-icon-off'))
+            else:
+                self.connection.setIcon(QtGui.QIcon('../img/bluetooth-icon-off'))
+        else:
+            self.connected_to_robot = True
+            if self.communication_style == "WIFI":
+                self.connection.setIcon(QtGui.QIcon('../img/wifi-icon-on'))
+            else:
+                self.connection.setIcon(QtGui.QIcon('../img/bluetooth-icon-on'))
+
     def changeValue(self, value):
         """
         Change value of the speed accordingly to the slidebar
@@ -257,7 +297,7 @@ class JRI(QtGui.QWidget):
         Connect to the robot
         :return:
         """
-
+        self.updateConnection()
         connection = connection2robot.ConnectToRobot(self)
         connection.connection_done.connect(self.update_connection) # this is called when a signal is emitted by such a thread
         self.threads.append(connection)
@@ -298,9 +338,12 @@ class JRI(QtGui.QWidget):
                 self.camera_driving_socket.sendData("yaw/" + str(0.0) + "/"+"pitch/" + str(0.0), IP=self.IP,
                                                     PORT=self.CAMERA_DRIVING_PORT)
             else:
-                self.driving_socket.close()
-                self.camera_driving_socket.send("yaw/" + str(0.0) + "/" + "pitch/" + str(0.0))
-                self.camera_driving_socket.close()
+                if self.driving_socket_connected:
+                    self.driving_socket.close()
+                if self.camera_driving_socket_connected:
+                    self.sendBluetoothData(self.camera_driving_socket,"yaw/" + str(0.0) + "/" + "pitch/" + str(0.0))
+                    #self.camera_driving_socket.send("yaw/" + str(0.0) + "/" + "pitch/" + str(0.0))
+                    self.camera_driving_socket.close()
 
             QtCore.QCoreApplication.instance().quit()
 
@@ -425,7 +468,8 @@ class JRI(QtGui.QWidget):
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
             else:
-                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                self.sendBluetoothData(self.camera_driving_socket,"yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                #self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.pitch_label.setText('PITCH: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
         if e.key() == QtCore.Qt.Key_Down:
@@ -437,7 +481,8 @@ class JRI(QtGui.QWidget):
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
             else:
-                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                self.sendBluetoothData(self.camera_driving_socket,"yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                #self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.pitch_label.setText('PITCH: ' + str(self.pitch_angle) + " +/-" + str(self.pitch_angle_range / 2))
         if e.key() == QtCore.Qt.Key_Right:
@@ -449,7 +494,8 @@ class JRI(QtGui.QWidget):
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
             else:
-                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                self.sendBluetoothData(self.camera_driving_socket,"yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                #self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range / 2))
         if e.key() == QtCore.Qt.Key_Left:
@@ -461,7 +507,8 @@ class JRI(QtGui.QWidget):
                 self.camera_driving_socket.sendData("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle),
                                                 IP=self.IP, PORT=self.CAMERA_DRIVING_PORT)
             else:
-                self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                self.sendBluetoothData(self.camera_driving_socket,"yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
+                #self.camera_driving_socket.send("yaw/" + str(self.yaw_angle) + "/" + "pitch/" + str(self.pitch_angle))
 
             self.yaw_label.setText('YAW: ' + str(self.yaw_angle) + " +/-" + str(self.yaw_angle_range/2))
 
@@ -504,27 +551,31 @@ class JRI(QtGui.QWidget):
                 if self.communication_style == 'WIFI':
                     self.driving_socket.sendData("forward-"+str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
                 else:
-                    self.driving_socket.send("forward-" + str(self.speed))
+                    self.sendBluetoothData(self.driving_socket,"forward-" + str(self.speed))
+                    #self.driving_socket.send("forward-" + str(self.speed))
         if self.a_pressed and not self.a_released:
             #self.print_('A pressed')
             if self.connected_to_robot:
                 if self.communication_style == 'WIFI':
                     self.driving_socket.sendData("left-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
                 else:
-                    self.driving_socket.send("left-" + str(self.speed))
+                    self.sendBluetoothData(self.driving_socket,"left-" + str(self.speed))
+                    #self.driving_socket.send("left-" + str(self.speed))
         if self.d_pressed and not self.d_released:
             #self.print_('D pressed')
             if self.connected_to_robot:
                 if self.communication_style == 'WIFI':
                     self.driving_socket.sendData("right-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
                 else:
-                    self.driving_socket.send("right-" + str(self.speed))
+                    self.sendBluetoothData(self.driving_socket,"right-" + str(self.speed))
+                    #self.driving_socket.send("right-" + str(self.speed))
         if self.s_pressed and not self.s_released:
             if self.connected_to_robot:
                 if self.communication_style == 'WIFI':
                     self.driving_socket.sendData("backward-" + str(self.speed), IP=self.IP, PORT=self.DRIVING_PORT)
                 else:
-                    self.driving_socket.send("backward-" + str(self.speed))
+                    self.sendBluetoothData(self.driving_socket,"backward-" + str(self.speed))
+                    #self.driving_socket.send("backward-" + str(self.speed))
         # if self.plus_pressed and not self.plus_released:
         #
         #     self.sld.setValue(self.sld.value() + 1)

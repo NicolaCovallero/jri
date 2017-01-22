@@ -7,6 +7,7 @@ __author__ = 'Nicola Covallero'
 
 from PyQt4 import QtCore
 import bluetooth
+import time
 
 class ConnectToRobot(QtCore.QThread):
     # reference: http://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt
@@ -102,41 +103,62 @@ class ConnectToRobot(QtCore.QThread):
             # here we do not do any test for the connection :P
 
             self.GUI.print_("Looking for DRIVING service ... ")
-            addr = None
-            service_matches = bluetooth.find_service(uuid=self.GUI.DRIVING_SERVICE_UUID, address=addr)
+            if self.GUI.driving_socket_connected:
+                self.GUI.driving_socket_connected = False
+                # reset
+                self.GUI.driving_socket = bluetooth.BluetoothSocket( bluetooth.RFCOMM )
+            driving_addr = None
+            service_matches = bluetooth.find_service(uuid=self.GUI.DRIVING_SERVICE_UUID, address=driving_addr)
+            #service_matches = []
             if len(service_matches)> 0:
                 port = service_matches[0]["port"]
                 name = service_matches[0]["name"]
                 host = service_matches[0]["host"]
+                driving_addr = host
                 self.GUI.print_("The following service was found:")
                 self.GUI.print_("port: " + str(port))
                 self.GUI.print_("name: " + str(name))
                 self.GUI.print_("host: " + str(host))
                 self.GUI.driving_socket.connect((host,port))
                 self.GUI.print_("Connection with DRIVING service established")
+                self.GUI.driving_socket_connected = True
             else:
                 self.GUI.print_("No DRIVING service found")
                 self.connection_done.emit(False)
+                return
+                driving_addr = None
 
             #TODO handle the blueetooth sockets in a better way, resetting and so on, saving on the address
             # in order to avoid look again for the raspberry is the connection was established and still working
 
-            self.GUI.print_("Looking for CAMERA_DRIVING service ... ")
-            service_matches = bluetooth.find_service(uuid=self.GUI.CAMERA_DRIVING_SERVICE_UUID, address=addr)
+            time.sleep(1.0)
+            self.GUI.print_("Looking for CAMERA_DRIVING service ... UUID:" + str(self.GUI.CAMERA_DRIVING_SERVICE_UUID))
+            if self.GUI.camera_driving_socket_connected:
+                self.GUI.camera_driving_socket_connected = False
+                # reset
+                self.GUI.camera_driving_socket = bluetooth.BluetoothSocket( bluetooth.RFCOMM )
+            camera_addr = None
+            service_matches = bluetooth.find_service(uuid=self.GUI.CAMERA_DRIVING_SERVICE_UUID, address=camera_addr)
             if len(service_matches) > 0:
                     port = service_matches[0]["port"]
                     name = service_matches[0]["name"]
                     host = service_matches[0]["host"]
+                    camera_addr = host
                     self.GUI.print_("The following service was found:")
+
                     self.GUI.print_("port: " + str(port))
                     self.GUI.print_("name: " + str(name))
                     self.GUI.print_("host: " + str(host))
                     self.GUI.camera_driving_socket.connect((host, port))
                     self.GUI.print_("Connection with CAMERA_DRIVING service established")
+                    self.GUI.camera_driving_socket_connected = True
             else:
                 self.GUI.print_("No CAMERA_DRIVING service found")
+                camera_addr = None
                 self.connection_done.emit(False)
+                return
 
+            self.GUI.camera_driving_socket_connected = True
             self.GUI.connected_to_robot = True
             self.connection_done.emit(True)
 
